@@ -183,7 +183,7 @@ ShellRoot {
 
     // Pushes Config.keybindsLoader (binds.json) keybinds into the compositor
     // live via `axctl config keybinds-batch` (runtime binds; not written to the
-    // generated hyprland config). Was removed by 92df9c23 "static config".
+    // generated hyprland config).
     CompositorKeybinds {
         id: compositorKeybinds
     }

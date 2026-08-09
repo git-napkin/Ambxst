@@ -14,12 +14,12 @@ Item {
     // Shared animation components (dedup of the 10 corner/geometry Behaviors
     // and 6 StackView transitions below)
     component NotchRadiusAnimation: NumberAnimation {
-        duration: Config.animDuration
+        duration: Styling.animStandard
         easing.type: Styling.animEasing
     }
     component FadeScaleTransition: Transition {
         id: fadeScale
-        property real fromScale: 0.8
+        property real fromScale: 0.96
         property real toScale: 1
         property bool entering: true
 
@@ -27,15 +27,15 @@ Item {
             property: "opacity"
             from: fadeScale.entering ? 0 : 1
             to: fadeScale.entering ? 1 : 0
-            duration: Config.animDuration
-            easing.type: Styling.animEasing
+            duration: fadeScale.entering ? Styling.animStandard : Styling.animQuick
+            easing.type: fadeScale.entering ? Styling.animEasingOut : Styling.animEasingIn
         }
         PropertyAnimation {
             property: "scale"
             from: fadeScale.fromScale
             to: fadeScale.toScale
-            duration: Config.animDuration
-            easing.type: Styling.animEasing
+            duration: fadeScale.entering ? Styling.animStandard : Styling.animQuick
+            easing.type: fadeScale.entering ? Styling.animEasingOut : Styling.animEasingIn
         }
     }
 

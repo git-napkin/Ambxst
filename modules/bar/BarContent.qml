@@ -217,31 +217,31 @@ Item {
         }
 
         Behavior on x {
-            enabled: (Config.animDuration !== undefined ? Config.animDuration : 0) > 0 && root.orientation === "vertical"
+            enabled: (Styling.animStandard > 0) && root.orientation === "vertical"
             NumberAnimation {
-                duration: (Config.animDuration !== undefined ? Config.animDuration : 0) / 4
+                duration: Styling.animQuick
                 easing.type: Styling.animEasing
             }
         }
         Behavior on y {
-            enabled: (Config.animDuration !== undefined ? Config.animDuration : 0) > 0 && root.orientation === "horizontal"
+            enabled: (Styling.animStandard > 0) && root.orientation === "horizontal"
             NumberAnimation {
-                duration: (Config.animDuration !== undefined ? Config.animDuration : 0) / 4
+                duration: Styling.animQuick
                 easing.type: Styling.animEasing
             }
         }
 
         Behavior on width {
-            enabled: (Config.animDuration !== undefined ? Config.animDuration : 0) > 0 && root.orientation === "vertical"
+            enabled: (Styling.animStandard > 0) && root.orientation === "vertical"
             NumberAnimation {
-                duration: (Config.animDuration !== undefined ? Config.animDuration : 0) / 4
+                duration: Styling.animQuick
                 easing.type: Styling.animEasing
             }
         }
         Behavior on height {
-            enabled: (Config.animDuration !== undefined ? Config.animDuration : 0) > 0 && root.orientation === "horizontal"
+            enabled: (Styling.animStandard > 0) && root.orientation === "horizontal"
             NumberAnimation {
-                duration: (Config.animDuration !== undefined ? Config.animDuration : 0) / 4
+                duration: Styling.animQuick
                 easing.type: Styling.animEasing
             }
         }
@@ -265,9 +265,9 @@ Item {
             // Opacity animation
             opacity: root.reveal ? 1 : 0
             Behavior on opacity {
-                enabled: (Config.animDuration !== undefined ? Config.animDuration : 0) > 0
+                enabled: Styling.animStandard > 0
                 NumberAnimation {
-                    duration: (Config.animDuration !== undefined ? Config.animDuration : 0) / 2
+                    duration: Styling.animQuick
                     easing.type: Styling.animEasing
                 }
             }
@@ -293,16 +293,16 @@ Item {
                     return 0;
                 }
                 Behavior on x {
-                    enabled: (Config.animDuration !== undefined ? Config.animDuration : 0) > 0
+                    enabled: Styling.animStandard > 0
                     NumberAnimation {
-                        duration: (Config.animDuration !== undefined ? Config.animDuration : 0) / 2
+                        duration: Styling.animStandard
                         easing.type: Styling.animEasing
                     }
                 }
                 Behavior on y {
-                    enabled: (Config.animDuration !== undefined ? Config.animDuration : 0) > 0
+                    enabled: Styling.animStandard > 0
                     NumberAnimation {
-                        duration: (Config.animDuration !== undefined ? Config.animDuration : 0) / 2
+                        duration: Styling.animStandard
                         easing.type: Styling.animEasing
                     }
                 }

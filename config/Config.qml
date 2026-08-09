@@ -116,7 +116,7 @@ Singleton {
     property bool aiReady: false
     property bool keybindsInitialLoadComplete: false
 
-    property bool initialLoadComplete: themeReady && barReady && workspacesReady && overviewReady && notchReady && compositorReady && performanceReady && weatherReady && desktopReady && lockscreenReady && prefixReady && systemReady && dockReady && aiReady
+    property bool initialLoadComplete: themeReady && barReady && workspacesReady && overviewReady && notchReady && compositorReady && performanceReady && weatherReady && desktopReady && lockscreenReady && prefixReady && systemReady && dockReady && aiReady && pinnedAppsReady
 
     // Compatibility aliases
     property alias loader: themeLoader
@@ -209,7 +209,15 @@ Singleton {
             property int monoFontSize: 14
             property bool tintIcons: false
             property bool enableCorners: true
-            property int animDuration: 300
+            property int animDuration: 200
+            property int animInstant: 100
+            property int animQuick: 150
+            property int animStandard: 200
+            property int animConsidered: 300
+            property int animCinematic: 500
+            property string animEasingOut: "OutCubic"
+            property string animEasingIn: "InCubic"
+            property string animEasingInOut: "InOutCubic"
             property real shadowOpacity: 0.5
             property string shadowColor: "shadow"
             property int shadowXOffset: 0
@@ -840,6 +848,7 @@ Singleton {
             property real blurPopupsIgnorealpha: 0.2
             property bool blurInputMethods: false
             property real blurInputMethodsIgnorealpha: 0.2
+            property bool switchToActivatedWorkspace: true
         }
     }
 
@@ -3528,6 +3537,14 @@ Singleton {
     property int roundness: theme.roundness
     property string defaultFont: theme.font
     property int animDuration: theme.animDuration
+    property int animInstant: theme.animInstant
+    property int animQuick: theme.animQuick
+    property int animStandard: theme.animStandard
+    property int animConsidered: theme.animConsidered
+    property int animCinematic: theme.animCinematic
+    property string animEasingOut: theme.animEasingOut
+    property string animEasingIn: theme.animEasingIn
+    property string animEasingInOut: theme.animEasingInOut
     property bool tintIcons: theme.tintIcons
 
     // Handle lightMode changes

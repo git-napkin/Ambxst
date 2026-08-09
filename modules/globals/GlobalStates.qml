@@ -191,13 +191,17 @@ Singleton {
     // Lockscreen state
     property bool lockscreenVisible: false
 
+    // Weather polling gate — true when any UI surface that displays weather
+    // data is open (dashboard weather tab, bar clock weather, overview weather).
+    // Lets the WeatherService idle its 10-min poll when nothing needs it.
+    readonly property bool weatherActive: dashboardOpen || launcherOpen
+
     // OSD state
     property bool osdVisible: false
     property string osdIndicator: "volume" // volume, mic, brightness
 
     // Screenshot Tool state
     property bool screenshotToolVisible: false
-    // property string screenshotToolMode: "normal" // DEPRECATED
     property string screenshotCaptureMode: "region" // region, window, screen
     
     // Global selection state for synchronization

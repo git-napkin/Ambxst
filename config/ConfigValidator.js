@@ -40,7 +40,10 @@ var enumValidators = {
     "sidebarPosition": ["left", "right"],
     "sidebarWidth": null,
     "lightMode": null,
-    "oledMode": null
+    "oledMode": null,
+    "animEasingOut": ["OutCubic", "OutQuart", "OutQuad", "OutExpo", "Linear"],
+    "animEasingIn": ["InCubic", "InQuart", "InQuad", "InExpo", "Linear"],
+    "animEasingInOut": ["InOutCubic", "InOutQuart", "InOutQuad", "InOutExpo", "Linear"]
 };
 
 var rangeValidators = {
@@ -48,6 +51,11 @@ var rangeValidators = {
     "fontSize": { min: 8, max: 72 },
     "monoFontSize": { min: 8, max: 72 },
     "animDuration": { min: 0, max: 2000 },
+    "animInstant": { min: 0, max: 500 },
+    "animQuick": { min: 0, max: 500 },
+    "animStandard": { min: 0, max: 500 },
+    "animConsidered": { min: 0, max: 800 },
+    "animCinematic": { min: 0, max: 1000 },
     "shadowOpacity": { min: 0, max: 1 },
     "shadowBlur": { min: 0, max: 20 },
     "shadowXOffset": { min: -100, max: 100 },

@@ -113,11 +113,8 @@ Singleton {
         id: cameraTimer
         interval: root.pollInterval
         repeat: true
-        running: true
-        onTriggered: {
-            if (!SuspendManager.isSuspending)
-                root.update();
-        }
+        running: !SuspendManager.isSuspending
+        onTriggered: root.update()
     }
 
     reloadableId: "camera"

@@ -19,8 +19,24 @@ var data = {
     "tintIcons": false,
     /** Enable screen corners. @type {boolean} @default true */
     "enableCorners": true,
-    /** Animation duration in milliseconds. @type {number} @min 0 @max 2000 @default 300 */
-    "animDuration": 300,
+    /** Animation duration in milliseconds (legacy/global default). @type {number} @min 0 @max 2000 @default 200 */
+    "animDuration": 200,
+    /** Micro-interactions: hover tint, focus ring, press feedback. @type {number} @min 0 @max 500 @default 100 */
+    "animInstant": 100,
+    /** Quick transitions: toggles, checkboxes, small UI feedback. @type {number} @min 0 @max 500 @default 150 */
+    "animQuick": 150,
+    /** Standard transitions: popups, dropdowns, OSD, tooltips. @type {number} @min 0 @max 500 @default 200 */
+    "animStandard": 200,
+    /** Considered transitions: panels, sidebars, modals. @type {number} @min 0 @max 800 @default 300 */
+    "animConsidered": 300,
+    /** Cinematic transitions: shell startup, lockscreen, wallpaper crossfade. @type {number} @min 0 @max 1000 @default 500 */
+    "animCinematic": 500,
+    /** Easing for entrances (elements appearing). @type {string} @enum OutCubic,OutQuart,OutQuad @default "OutCubic" */
+    "animEasingOut": "OutCubic",
+    /** Easing for exits (elements disappearing). @type {string} @enum InCubic,InQuart,InQuad @default "InCubic" */
+    "animEasingIn": "InCubic",
+    /** Easing for state transitions (elements moving between states). @type {string} @enum InOutCubic,InOutQuart @default "InOutCubic" */
+    "animEasingInOut": "InOutCubic",
     /** Shadow opacity. @type {number} @min 0 @max 1 @default 0.5 */
     "shadowOpacity": 0.5,
     /** Shadow color name. @type {string} @default "shadow" */

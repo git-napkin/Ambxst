@@ -35,10 +35,30 @@ QtObject {
     readonly property real hoverAlpha: 0.12
     readonly property real pressAlpha: 0.24
 
-    // Single canonical easing for shell motion. Centralizing it lets every
-    // surface share the same "weight" of animation (OutQuart was inconsistent
-    // with OutCubic/OutQuad used elsewhere).
+    // Animation duration tiers — each surface picks the tier that matches its
+    // purpose. Centralized here so the entire shell shares one timing system.
+    // Tier guide:
+    //   instant    → micro-feedback (hover tint, focus ring, press ripple)
+    //   quick      → toggles, checkboxes, small UI responses
+    //   standard   → popups, dropdowns, OSD, tooltips
+    //   considered → panels, sidebars, modals
+    //   cinematic  → shell startup, lockscreen, wallpaper crossfade
+    readonly property int animInstant: Config.animInstant
+    readonly property int animQuick: Config.animQuick
+    readonly property int animStandard: Config.animStandard
+    readonly property int animConsidered: Config.animConsidered
+    readonly property int animCinematic: Config.animCinematic
+
+    // Legacy alias — keeps the 482 existing `Config.theme.animDuration` sites
+    // working without editing them all. New code should use the tier above.
+    readonly property int animDuration: Config.animDuration
+
+    // Canonical easings — centralized so motion "weight" is uniform.
+    // Out for entrances, In for exits, InOut for state transitions.
     readonly property int animEasing: Easing.OutCubic
+    readonly property int animEasingOut: Easing.OutCubic
+    readonly property int animEasingIn: Easing.InCubic
+    readonly property int animEasingInOut: Easing.InOutCubic
 
     function getStyledRectConfig(variant) {
         switch (variant) {

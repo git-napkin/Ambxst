@@ -55,19 +55,19 @@ PanelWindow {
             transform: Translate { y: osdRect.slideY }
 
             Behavior on slideY {
-                enabled: Config.animDuration > 0
+                enabled: Styling.animStandard > 0
                 NumberAnimation {
-                    duration: Config.animDuration
-                    easing.type: Easing.OutQuart
+                    duration: Styling.animStandard
+                    easing.type: Styling.animEasingOut
                 }
             }
 
             opacity: GlobalStates.osdVisible ? 1.0 : 0.0
             Behavior on opacity {
-                enabled: Config.animDuration > 0
+                enabled: Styling.animStandard > 0
                 NumberAnimation {
-                    duration: Config.animDuration
-                    easing.type: Easing.OutQuart
+                    duration: Styling.animQuick
+                    easing.type: Styling.animEasingOut
                 }
             }
 
@@ -99,18 +99,18 @@ PanelWindow {
                     scale: GlobalStates.osdIndicator === "brightness" ? (0.8 + (root.osdValue * 0.2)) : 1
 
                     Behavior on rotation {
-                        enabled: Config.animDuration > 0
+                        enabled: Styling.animStandard > 0
                         NumberAnimation {
-                            duration: Config.animDuration
-                            easing.type: Easing.OutQuart
+                            duration: Styling.animQuick
+                            easing.type: Styling.animEasingOut
                         }
                     }
 
                     Behavior on scale {
-                        enabled: Config.animDuration > 0
+                        enabled: Styling.animStandard > 0
                         NumberAnimation {
-                            duration: Config.animDuration
-                            easing.type: Easing.OutQuart
+                            duration: Styling.animQuick
+                            easing.type: Styling.animEasingOut
                         }
                     }
                 }
