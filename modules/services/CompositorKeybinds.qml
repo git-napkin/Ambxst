@@ -115,7 +115,7 @@ QtObject {
     function ensureReleaseFlag(flags, key) {
         if (!isModifierKeyName(key)) return flags;
         var f = String(flags || "");
-        if (f.indexOf("r") === -1) f += "r";
+        if (f.indexOf("e") === -1) f += "e";
         return f;
     }
 

@@ -209,12 +209,12 @@ Singleton {
             property int monoFontSize: 14
             property bool tintIcons: false
             property bool enableCorners: true
-            property int animDuration: 200
+            property int animDuration: 300
             property int animInstant: 100
             property int animQuick: 150
-            property int animStandard: 200
-            property int animConsidered: 300
-            property int animCinematic: 500
+            property int animStandard: 300
+            property int animConsidered: 400
+            property int animCinematic: 600
             property string animEasingOut: "OutCubic"
             property string animEasingIn: "InCubic"
             property string animEasingInOut: "InOutCubic"

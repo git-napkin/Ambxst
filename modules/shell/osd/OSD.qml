@@ -66,7 +66,7 @@ PanelWindow {
             Behavior on opacity {
                 enabled: Styling.animStandard > 0
                 NumberAnimation {
-                    duration: Styling.animQuick
+                    duration: Styling.animStandard
                     easing.type: Styling.animEasingOut
                 }
             }
@@ -101,7 +101,7 @@ PanelWindow {
                     Behavior on rotation {
                         enabled: Styling.animStandard > 0
                         NumberAnimation {
-                            duration: Styling.animQuick
+                            duration: Styling.animStandard
                             easing.type: Styling.animEasingOut
                         }
                     }
@@ -109,7 +109,7 @@ PanelWindow {
                     Behavior on scale {
                         enabled: Styling.animStandard > 0
                         NumberAnimation {
-                            duration: Styling.animQuick
+                            duration: Styling.animStandard
                             easing.type: Styling.animEasingOut
                         }
                     }

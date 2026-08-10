@@ -27,14 +27,14 @@ Item {
             property: "opacity"
             from: fadeScale.entering ? 0 : 1
             to: fadeScale.entering ? 1 : 0
-            duration: fadeScale.entering ? Styling.animStandard : Styling.animQuick
+            duration: Styling.animStandard
             easing.type: fadeScale.entering ? Styling.animEasingOut : Styling.animEasingIn
         }
         PropertyAnimation {
             property: "scale"
             from: fadeScale.fromScale
             to: fadeScale.toScale
-            duration: fadeScale.entering ? Styling.animStandard : Styling.animQuick
+            duration: Styling.animStandard
             easing.type: fadeScale.entering ? Styling.animEasingOut : Styling.animEasingIn
         }
     }

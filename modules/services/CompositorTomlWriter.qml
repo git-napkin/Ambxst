@@ -184,6 +184,21 @@ Singleton {
             return { dispatcher: dispatcher, argument: argument };
         }
 
+        function isModifierKeyName(key) {
+            return key === "Super_L" || key === "Super_R"
+                || key === "Control_L" || key === "Control_R"
+                || key === "Alt_L" || key === "Alt_R"
+                || key === "Shift_L" || key === "Shift_R"
+                || key === "Meta" || key === "Hyper_L" || key === "Hyper_R";
+        }
+
+        function ensureReleaseFlag(flags, key) {
+            if (!isModifierKeyName(key)) return flags;
+            var f = String(flags || "");
+            if (f.indexOf("e") === -1) f += "e";
+            return f;
+        }
+
         function resolveBindAction(action, fallback) {
             const resolved = KeybindActions.resolveAction(action || fallback);
             if (!resolved) return null;
@@ -274,7 +289,7 @@ Singleton {
                     keybind.key || "",
                     resolved.dispatcher,
                     resolved.argument,
-                    resolved.flags
+                    ensureReleaseFlag(resolved.flags, keybind.key)
                 );
             }
 
@@ -325,7 +340,7 @@ Singleton {
                                     keyObj.key || "",
                                     resolved.dispatcher,
                                     resolved.argument,
-                                    resolved.flags
+                                    ensureReleaseFlag(resolved.flags, keyObj.key)
                                 );
                             }
                         }
@@ -339,7 +354,7 @@ Singleton {
                             bind.key || "",
                             resolved.dispatcher,
                             resolved.argument,
-                            resolved.flags
+                            ensureReleaseFlag(resolved.flags, bind.key)
                         );
                     }
                 }

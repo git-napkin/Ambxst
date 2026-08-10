@@ -217,31 +217,31 @@ Item {
         }
 
         Behavior on x {
-            enabled: (Styling.animStandard > 0) && root.orientation === "vertical"
+            enabled: (Styling.animInstant > 0) && root.orientation === "vertical"
             NumberAnimation {
-                duration: Styling.animQuick
+                duration: Styling.animInstant
                 easing.type: Styling.animEasing
             }
         }
         Behavior on y {
-            enabled: (Styling.animStandard > 0) && root.orientation === "horizontal"
+            enabled: (Styling.animInstant > 0) && root.orientation === "horizontal"
             NumberAnimation {
-                duration: Styling.animQuick
+                duration: Styling.animInstant
                 easing.type: Styling.animEasing
             }
         }
 
         Behavior on width {
-            enabled: (Styling.animStandard > 0) && root.orientation === "vertical"
+            enabled: (Styling.animInstant > 0) && root.orientation === "vertical"
             NumberAnimation {
-                duration: Styling.animQuick
+                duration: Styling.animInstant
                 easing.type: Styling.animEasing
             }
         }
         Behavior on height {
-            enabled: (Styling.animStandard > 0) && root.orientation === "horizontal"
+            enabled: (Styling.animInstant > 0) && root.orientation === "horizontal"
             NumberAnimation {
-                duration: Styling.animQuick
+                duration: Styling.animInstant
                 easing.type: Styling.animEasing
             }
         }
@@ -265,7 +265,7 @@ Item {
             // Opacity animation
             opacity: root.reveal ? 1 : 0
             Behavior on opacity {
-                enabled: Styling.animStandard > 0
+                enabled: Styling.animQuick > 0
                 NumberAnimation {
                     duration: Styling.animQuick
                     easing.type: Styling.animEasing
@@ -293,16 +293,16 @@ Item {
                     return 0;
                 }
                 Behavior on x {
-                    enabled: Styling.animStandard > 0
+                    enabled: Styling.animQuick > 0
                     NumberAnimation {
-                        duration: Styling.animStandard
+                        duration: Styling.animQuick
                         easing.type: Styling.animEasing
                     }
                 }
                 Behavior on y {
-                    enabled: Styling.animStandard > 0
+                    enabled: Styling.animQuick > 0
                     NumberAnimation {
-                        duration: Styling.animStandard
+                        duration: Styling.animQuick
                         easing.type: Styling.animEasing
                     }
                 }

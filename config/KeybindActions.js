@@ -29,7 +29,7 @@ function directionToLetter(direction) {
 }
 
 var ACTION_CATALOG = [
-    { id: "ambxst+.launcher", label: "Open Launcher", category: "ambxst+", dispatcher: "exec", argument: "ambxst+ run launcher", flags: "r" },
+    { id: "ambxst+.launcher", label: "Open Launcher", category: "ambxst+", dispatcher: "exec", argument: "ambxst+ run launcher", flags: "e" },
     { id: "ambxst+.dashboard", label: "Open Dashboard", category: "ambxst+", dispatcher: "exec", argument: "ambxst+ run dashboard" },
     { id: "ambxst+.assistant", label: "Open Assistant", category: "ambxst+", dispatcher: "exec", argument: "ambxst+ run assistant" },
     { id: "ambxst+.clipboard", label: "Open Clipboard", category: "ambxst+", dispatcher: "exec", argument: "ambxst+ run clipboard" },
@@ -105,15 +105,15 @@ var ACTION_CATALOG = [
     { id: "media.next", label: "Next Track", category: "Media", dispatcher: "exec", argument: "playerctl next" },
     { id: "media.stop-locked", label: "Stop Playback (Locked)", category: "Media", dispatcher: "exec", argument: "playerctl stop", flags: "l" },
 
-    { id: "audio.volume-up", label: "Volume Up", category: "Audio", dispatcher: "exec", argument: "ambxst+ run volume-up", flags: "le" },
-    { id: "audio.volume-down", label: "Volume Down", category: "Audio", dispatcher: "exec", argument: "ambxst+ run volume-down", flags: "le" },
-    { id: "audio.volume-up-fine", label: "Volume Up (Fine)", category: "Audio", dispatcher: "exec", argument: "ambxst+ run volume-up-fine", flags: "le" },
-    { id: "audio.volume-down-fine", label: "Volume Down (Fine)", category: "Audio", dispatcher: "exec", argument: "ambxst+ run volume-down-fine", flags: "le" },
-    { id: "audio.mute-toggle", label: "Mute Audio", category: "Audio", dispatcher: "exec", argument: "ambxst+ run volume-mute", flags: "le" },
-    { id: "audio.mic-mute-toggle", label: "Mute Microphone", category: "Audio", dispatcher: "exec", argument: "ambxst+ run mic-mute", flags: "le" },
+    { id: "audio.volume-up", label: "Volume Up", category: "Audio", dispatcher: "exec", argument: "ambxst+ run volume-up", flags: "lr" },
+    { id: "audio.volume-down", label: "Volume Down", category: "Audio", dispatcher: "exec", argument: "ambxst+ run volume-down", flags: "lr" },
+    { id: "audio.volume-up-fine", label: "Volume Up (Fine)", category: "Audio", dispatcher: "exec", argument: "ambxst+ run volume-up-fine", flags: "lr" },
+    { id: "audio.volume-down-fine", label: "Volume Down (Fine)", category: "Audio", dispatcher: "exec", argument: "ambxst+ run volume-down-fine", flags: "lr" },
+    { id: "audio.mute-toggle", label: "Mute Audio", category: "Audio", dispatcher: "exec", argument: "ambxst+ run volume-mute", flags: "lr" },
+    { id: "audio.mic-mute-toggle", label: "Mute Microphone", category: "Audio", dispatcher: "exec", argument: "ambxst+ run mic-mute", flags: "lr" },
 
-    { id: "brightness.up", label: "Brightness Up", category: "Brightness", dispatcher: "exec", argument: "ambxst+ brightness +5", flags: "le" },
-    { id: "brightness.down", label: "Brightness Down", category: "Brightness", dispatcher: "exec", argument: "ambxst+ brightness -5", flags: "le" },
+    { id: "brightness.up", label: "Brightness Up", category: "Brightness", dispatcher: "exec", argument: "ambxst+ brightness +5", flags: "lr" },
+    { id: "brightness.down", label: "Brightness Down", category: "Brightness", dispatcher: "exec", argument: "ambxst+ brightness -5", flags: "lr" },
 
     { id: "system.calculator", label: "Calculator", category: "System", dispatcher: "exec", argument: "notify-send \"Soon\"" },
     { id: "system.lock", label: "Lock Session", category: "System", dispatcher: "exec", argument: "loginctl lock-session" },
