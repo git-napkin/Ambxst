@@ -46,56 +46,94 @@ QtObject {
         }
     }
 
+    // Super keys bound with the release flag (launcher/dashboard) would also
+    // fire after a chord (e.g. SUPER + T): Hyprland has no "exclude when part
+    // of a chord" flag and its Lua API cannot express catchall binds. Instead
+    // the shell arms a slot on modkey press and treats any OTHER ambxst+ IPC
+    // arriving while a slot is armed as the chord; the release bind then only
+    // toggles when the slot is still clean (a bare tap of the modkey).
+    property var superSlots: ({})  // key -> { action: string, chord: bool }
+
+    function superPress(key, action) {
+        superSlots[key] = { action: action, chord: false };
+    }
+
+    function superChord() {
+        for (const key in superSlots) {
+            superSlots[key].chord = true;
+        }
+    }
+
+    function superRelease(key) {
+        const slot = superSlots[key];
+        delete superSlots[key];
+        if (slot && !slot.chord && slot.action) {
+            root.run(slot.action);
+        }
+    }
+
     function run(command) {
         console.log("IPC run command received:", command);
-        switch (command) {
+        const parts = command.split(" ");
+        const verb = parts[0];
+        if (verb === "super-press") {
+            superPress(parts[1], parts.slice(2).join(" "));
+            return;
+        }
+        if (verb === "super-release") {
+            superRelease(parts[1]);
+            return;
+        }
+        switch (verb) {
             // Launcher (Standalone Notch Module)
-            case "launcher": toggleLauncher(); break;
-            case "clipboard": toggleLauncherWithPrefix(1, (Config.prefix?.clipboard ?? "") + " "); break;
-            case "emoji": toggleLauncherWithPrefix(2, (Config.prefix?.emoji ?? "") + " "); break;
-            case "tmux": toggleLauncherWithPrefix(3, (Config.prefix?.tmux ?? "") + " "); break;
-            case "notes": toggleLauncherWithPrefix(4, (Config.prefix?.notes ?? "") + " "); break;
+            case "launcher": superChord(); toggleLauncher(); break;
+            case "clipboard": superChord(); toggleLauncherWithPrefix(1, (Config.prefix?.clipboard ?? "") + " "); break;
+            case "emoji": superChord(); toggleLauncherWithPrefix(2, (Config.prefix?.emoji ?? "") + " "); break;
+            case "tmux": superChord(); toggleLauncherWithPrefix(3, (Config.prefix?.tmux ?? "") + " "); break;
+            case "notes": superChord(); toggleLauncherWithPrefix(4, (Config.prefix?.notes ?? "") + " "); break;
 
             // Dashboard
-            case "dashboard": toggleDashboardTab(0); break;
-            case "wallpapers": toggleDashboardTab(1); break;
-            case "assistant": toggleAssistant(); break;
-            case "dashboard-widgets": toggleDashboardTab(0); break;
-            case "dashboard-wallpapers": toggleDashboardTab(1); break;
-            case "dashboard-kanban": toggleDashboardTab(2); break;
-            case "dashboard-assistant": toggleAssistant(); break;
-            case "dashboard-controls": toggleSettings(); break;
+            case "dashboard": superChord(); toggleDashboardTab(0); break;
+            case "wallpapers": superChord(); toggleDashboardTab(1); break;
+            case "assistant": superChord(); toggleAssistant(); break;
+            case "dashboard-widgets": superChord(); toggleDashboardTab(0); break;
+            case "dashboard-wallpapers": superChord(); toggleDashboardTab(1); break;
+            case "dashboard-kanban": superChord(); toggleDashboardTab(2); break;
+            case "dashboard-assistant": superChord(); toggleAssistant(); break;
+            case "dashboard-controls": superChord(); toggleSettings(); break;
 
             // System
-            case "overview": toggleSimpleModule("overview"); break;
-            case "powermenu": toggleSimpleModule("powermenu"); break;
-            case "tools": toggleSimpleModule("tools"); break;
-            case "config": toggleSettings(); break;
-            case "screenshot": Screenshot.initialize(); GlobalStates.screenshotToolVisible = true; break;
-            case "screenrecord": ScreenRecorder.initialize(); GlobalStates.screenRecordToolVisible = true; break;
+            case "overview": superChord(); toggleSimpleModule("overview"); break;
+            case "powermenu": superChord(); toggleSimpleModule("powermenu"); break;
+            case "tools": superChord(); toggleSimpleModule("tools"); break;
+            case "config": superChord(); toggleSettings(); break;
+            case "screenshot": superChord(); Screenshot.initialize(); GlobalStates.screenshotToolVisible = true; break;
+            case "screenrecord": superChord(); ScreenRecorder.initialize(); GlobalStates.screenRecordToolVisible = true; break;
             case "lens": 
+                superChord();
                 Screenshot.initialize();
                 Screenshot.captureMode = "lens";
                 GlobalStates.screenshotToolVisible = true;
                 break;
-            case "lockscreen": GlobalStates.lockscreenVisible = true; break;
-            
+            case "lockscreen": superChord(); GlobalStates.lockscreenVisible = true; break;
+
             // Audio
-            case "volume-up": Audio.incrementVolume(); break;
-            case "volume-down": Audio.decrementVolume(); break;
-            case "volume-up-fine": Audio.incrementVolumeFine(); break;
-            case "volume-down-fine": Audio.decrementVolumeFine(); break;
-            case "volume-mute": Audio.toggleMute(); break;
-            case "mic-mute": Audio.toggleMicMute(); break;
+            case "volume-up": superChord(); Audio.incrementVolume(); break;
+            case "volume-down": superChord(); Audio.decrementVolume(); break;
+            case "volume-up-fine": superChord(); Audio.incrementVolumeFine(); break;
+            case "volume-down-fine": superChord(); Audio.decrementVolumeFine(); break;
+            case "volume-mute": superChord(); Audio.toggleMute(); break;
+            case "mic-mute": superChord(); Audio.toggleMicMute(); break;
 
             // Media
-            case "media-seek-backward": seekActivePlayer(-mediaSeekStepMs); break;
-            case "media-seek-forward": seekActivePlayer(mediaSeekStepMs); break;
+            case "media-seek-backward": superChord(); seekActivePlayer(-mediaSeekStepMs); break;
+            case "media-seek-forward": superChord(); seekActivePlayer(mediaSeekStepMs); break;
             case "media-play-pause": 
+                superChord();
                 if (MprisController.canTogglePlaying) MprisController.togglePlaying();
                 break;
-            case "media-next": MprisController.next(); break;
-            case "media-prev": MprisController.previous(); break;
+            case "media-next": superChord(); MprisController.next(); break;
+            case "media-prev": superChord(); MprisController.previous(); break;
                 
             default: console.warn("Unknown IPC command:", command);
         }

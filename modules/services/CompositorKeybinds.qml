@@ -119,6 +119,41 @@ QtObject {
         return f;
     }
 
+    // Expand a modifier-key bind that fires on release (e.g. launcher on
+    // Super_R) into a press/release pair. Hyprland fires such release binds
+    // even after a chord (SUPER + T), so on press we arm a slot in the shell
+    // and the release only toggles when no other ambxst+ action fired in
+    // between (a bare tap). Returns the bind unchanged when not applicable.
+    function expandSuperBind(bind) {
+        if (!isModifierKeyName(bind.key))
+            return [bind];
+        const flags = String(bind.flags || "");
+        if (flags.indexOf("e") === -1)
+            return [bind];
+        const parts = String(bind.argument || "").split(" ");
+        if (parts[0] !== "ambxst+" || parts[1] !== "run")
+            return [bind];
+        const action = parts.slice(2).join(" ");
+        return [
+            {
+                modifiers: bind.modifiers,
+                key: bind.key,
+                dispatcher: bind.dispatcher,
+                argument: "ambxst+ run super-press " + bind.key + " " + action,
+                flags: "",
+                enabled: true
+            },
+            {
+                modifiers: bind.modifiers,
+                key: bind.key,
+                dispatcher: bind.dispatcher,
+                argument: "ambxst+ run super-release " + bind.key,
+                flags: flags,
+                enabled: true
+            }
+        ];
+    }
+
     // Build a structured bind object from a core keybind (has all fields inline).
     function resolveBindAction(action, fallback) {
         const resolved = KeybindActions.resolveAction(action || fallback);
@@ -132,29 +167,29 @@ QtObject {
 
     function makeBindFromCore(keybind) {
         const resolved = resolveBindAction(keybind.action, keybind);
-        if (!resolved) return null;
-        return {
+        if (!resolved) return [];
+        return expandSuperBind({
             modifiers: keybind.modifiers || [],
             key: keybind.key || "",
             dispatcher: resolved.dispatcher,
             argument: resolved.argument,
             flags: ensureReleaseFlag(resolved.flags, keybind.key),
             enabled: true
-        };
+        });
     }
 
     // Build a structured bind object from a key + action pair (custom keybinds).
     function makeBindFromKeyAction(keyObj, action) {
         const resolved = resolveBindAction(action, action);
-        if (!resolved) return null;
-        return {
+        if (!resolved) return [];
+        return expandSuperBind({
             modifiers: keyObj.modifiers || [],
             key: keyObj.key || "",
             dispatcher: resolved.dispatcher,
             argument: resolved.argument,
             flags: ensureReleaseFlag(resolved.flags, keyObj.key),
             enabled: true
-        };
+        });
     }
 
     function applyKeybindsInternal() {
@@ -231,8 +266,7 @@ QtObject {
 
         // Bind current core keybinds
         [ambxstPlus.launcher, ambxstPlus.dashboard, ambxstPlus.assistant, ambxstPlus.clipboard, ambxstPlus.emoji, ambxstPlus.notes, ambxstPlus.tmux, ambxstPlus.wallpapers].forEach(bind => {
-            const resolved = makeBindFromCore(bind);
-            if (resolved) payload.binds.push(resolved);
+            payload.binds.push(...makeBindFromCore(bind));
         });
 
         // System keybinds
@@ -253,8 +287,7 @@ QtObject {
         // Bind current system keybinds
         [system.overview, system.powermenu, system.config, system.lockscreen, system.tools, system.screenshot, system.screenrecord, system.lens, system.reload, system.quit].forEach(bind => {
             if (!bind) return;
-            const resolved = makeBindFromCore(bind);
-            if (resolved) payload.binds.push(resolved);
+            payload.binds.push(...makeBindFromCore(bind));
         });
 
         // Process custom keybinds (keys[] and actions[] format).
@@ -278,8 +311,7 @@ QtObject {
                                 const action = bind.actions[a];
                                 // Check if this action is compatible with the current layout
                                 if (isActionCompatibleWithLayout(action)) {
-                                    const resolved = makeBindFromKeyAction(bind.keys[k], action);
-                                    if (resolved) payload.binds.push(resolved);
+                                    payload.binds.push(...makeBindFromKeyAction(bind.keys[k], action));
                                 }
                             }
                         }
@@ -288,8 +320,7 @@ QtObject {
                     // Fallback for old format (shouldn't happen after normalization)
                     payload.unbinds.push(makeUnbindTarget(bind));
                     if (bind.enabled !== false) {
-                        const resolved = makeBindFromCore(bind);
-                        if (resolved) payload.binds.push(resolved);
+                        payload.binds.push(...makeBindFromCore(bind));
                     }
                 }
             }
