@@ -84,7 +84,7 @@ FileView {
         interval: 100
         repeat: false
         onTriggered: {
-            const input = (colors.text() || "") + "|oled:" + Config.oledMode + "|light:" + Config.lightMode + "|bg:" + (Config.theme.srBg ? Config.theme.srBg.opacity : 0);
+            const input = (colors.text() || "") + "|oled:" + Config.oledMode + "|light:" + Config.lightMode + "|bg:" + (Config.theme.srBg ? Config.theme.srBg.opacity : 0) + "|font:" + Config.theme.font;
             if (input !== "" && input === colors._lastGenerationInput)
                 return;
             colors._lastGenerationInput = input;

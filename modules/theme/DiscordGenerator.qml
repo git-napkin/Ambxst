@@ -9,7 +9,7 @@ QtObject {
     property var pendingPalette
     property string requestedFont: ""
 
-    function escape(str) {
+    function shellEscape(str) {
         if (!str) return ""
         return str.toString()
             .replace(/\\/g, "\\\\")
@@ -24,7 +24,7 @@ QtObject {
         pendingPalette = Colors
         requestedFont = Config.theme.font || "gg sans"
 
-        fontCheckProcess.command = ["sh", "-c", `fc-match --format "%{scalable}" "${escape(requestedFont)}"`]
+        fontCheckProcess.command = ["sh", "-c", `fc-match --format "%{scalable}" "${shellEscape(requestedFont)}"`]
         fontCheckProcess.running = true
     }
 
@@ -33,7 +33,7 @@ QtObject {
         if (!Colors) return
 
         const scalable = fontCheckCollector.text.trim().toLowerCase() === "true"
-        const font = scalable ? requestedFont : "gg sans"
+        const font = scalable ? `"${requestedFont}", "gg sans"` : "gg sans"
 
         const toRGB = (c) => {
             return `${Math.round(c.r * 255)},${Math.round(c.g * 255)},${Math.round(c.b * 255)}`
@@ -89,7 +89,7 @@ QtObject {
   --textdark: ${textdark};
   --textdarker: ${textdarker};
   --textdarkest: ${textdarkest};
-  --font: "${font}", "gg sans";
+  --font: ${font};
   --backgroundaccent: ${backgroundaccent};
   --backgroundprimary: ${backgroundprimary};
   --backgroundsecondary: ${backgroundsecondary};
@@ -105,7 +105,7 @@ QtObject {
         const home = Quickshell.env("HOME")
         const vesktopPath = home + "/.config/vesktop/themes/ambxst+.css"
 
-        const cmd = `mkdir -p "$(dirname "${vesktopPath}")" && echo "${escape(css)}" > "${vesktopPath}"`
+        const cmd = `mkdir -p "$(dirname "${vesktopPath}")" && echo "${shellEscape(css)}" > "${vesktopPath}"`
         
         writerProcess.command = ["sh", "-c", cmd]
         writerProcess.running = true
