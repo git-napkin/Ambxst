@@ -7,7 +7,35 @@ import "../../config/KeybindActions.js" as KeybindActions
 QtObject {
     id: root
 
-    property Process compositorProcess: Process {}
+    property Process compositorProcess: Process {
+        stdout: StdioCollector {
+            onStreamFinished: {
+                const out = text.trim();
+                if (out.length > 0) console.log("CompositorKeybinds: axctl stdout:", out);
+            }
+        }
+        stderr: StdioCollector {
+            onStreamFinished: {
+                const err = text.trim();
+                if (err.length > 0) console.warn("CompositorKeybinds: axctl stderr:", err);
+            }
+        }
+        onExited: (code, status) => {
+            if (code !== 0 || status !== 0) {
+                console.warn("CompositorKeybinds: keybinds-batch failed code=" + code + " status=" + status + " – will retry in 500ms");
+                // Retry once – Hyprland may have been restarting
+                if (!retryTimer.running) retryTimer.restart();
+            } else {
+                console.log("CompositorKeybinds: keybinds-batch succeeded");
+            }
+        }
+    }
+
+    property Timer retryTimer: Timer {
+        interval: 500
+        repeat: false
+        onTriggered: applyKeybindsInternal()
+    }
 
     property var previousAmbxstPlusBinds: ({})
     property var previousCustomBinds: []
