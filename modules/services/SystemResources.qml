@@ -91,10 +91,6 @@ Singleton {
             }
         }
 
-        onRunningChanged: {
-            if (running) root._restartAttempts = 0;
-        }
-
         stdout: SplitParser {
             onRead: data => {
                 try {

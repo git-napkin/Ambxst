@@ -250,7 +250,25 @@ Singleton {
         return limitedNotifications;
     }
 
+    function _destroyNotifList(list) {
+        for (let i = 0; i < list.length; ++i) {
+            const n = list[i];
+            if (!n) continue;
+            if (n.timer) {
+                n.timer.stop();
+                n.timer.destroy();
+                n.timer = null;
+            }
+            const toDestroy = n;
+            Qt.callLater(() => toDestroy.destroy());
+        }
+    }
+
     function loadNotifications() {
+        // Destroy previously loaded objects before replacing the list —
+        // they are parented to root and would otherwise leak on every
+        // file reload (watcher-triggered or manual).
+        const oldList = root.list.slice(0);
         try {
             const data = JSON.parse(notifFileView.text());
             root.list = data.map(jsonToNotif);
@@ -268,6 +286,7 @@ Singleton {
             root.list = [];
             root.idOffset = 0;
         }
+        _destroyNotifList(oldList);
     }
 
     onListChanged: {

@@ -42,6 +42,36 @@ ENROLL_HINTS = {
     8: "Sensor disconnected",
 }
 
+# fprintd >= 1.90 emits string statuses on VerifyStatus/EnrollStatus;
+# map them to hint text (int codes above are legacy fallbacks).
+VERIFY_STATUS_HINTS = {
+    "verify-swipe-too-short": "Swipe was too short — try again",
+    "verify-finger-not-centered": "Center your finger on the sensor",
+    "verify-remove-and-retry": "Lift your finger and try again",
+    "verify-disconnected": "Sensor disconnected",
+}
+
+ENROLL_STATUS_HINTS = {
+    "enroll-stage-passed": "__stage__",
+    "enroll-retry-scan": "Retry the scan",
+    "enroll-scan-failed": "Scan failed — try again",
+    "enroll-finger-not-centered": "Center your finger on the sensor",
+    "enroll-remove-and-retry": "Lift your finger and try again",
+    "enroll-swipe-too-short": "Swipe was too short — try again",
+    "enroll-disconnected": "Sensor disconnected",
+}
+
+
+def _status_str(value):
+    """Normalize a dbus status arg to a plain string, or None for ints/other."""
+    if isinstance(value, int):
+        return None
+    try:
+        s = str(value)
+    except Exception:
+        return None
+    return s if not s.isdigit() else None
+
 
 def get_bus():
     """Get D-Bus bus — fprintd is a system service, try SystemBus first."""
@@ -229,11 +259,14 @@ def verify_finger():
                         args = msg.get_args_list()
                         if len(args) >= 2:
                             done = bool(args[0])
-                            result_code = args[1] if isinstance(args[1], int) else None
+                            status = _status_str(args[1])
                             if done:
-                                success = (result_code == 1) if result_code is not None else True
+                                # fprintd >= 1.90: "verify-match" / "verify-no-match";
+                                # legacy int codes: 1 = match. Unknown → assume match.
+                                success = (status == "verify-match" if status is not None
+                                           else (args[1] == 1 if isinstance(args[1], int) else True))
                             else:
-                                hint = ENROLL_HINTS.get(result_code)
+                                hint = VERIFY_STATUS_HINTS.get(status)
                                 if hint and hint != last_hint:
                                     print(json.dumps({"status": "hint", "message": hint}))
                                     sys.stdout.flush()
@@ -336,20 +369,18 @@ def enroll_finger(finger):
                         args = msg.get_args_list()
                         if len(args) >= 2:
                             done = bool(args[0])
-                            result_code = None
-                            if len(args) >= 3 and isinstance(args[2], int):
-                                result_code = int(args[2])
-                            elif isinstance(args[1], int):
-                                result_code = int(args[1])
-
+                            status = _status_str(args[1])
                             if done:
-                                success = (result_code == 0 if result_code is not None else True)
-                            elif result_code == 1:
+                                # fprintd >= 1.90: "enroll-completed" / "enroll-failed";
+                                # legacy int codes: 0 = complete. Unknown → assume success.
+                                success = (status == "enroll-completed" if status is not None
+                                           else (args[1] == 0 if isinstance(args[1], int) else True))
+                            elif status == "enroll-stage-passed" or args[1] == 1:
                                 stage += 1
                                 print(json.dumps({"status": "scanning", "stage": stage, "message": "Lift and replace your finger"}))
                                 sys.stdout.flush()
                             else:
-                                hint = ENROLL_HINTS.get(result_code)
+                                hint = ENROLL_STATUS_HINTS.get(status) or ENROLL_HINTS.get(args[1] if isinstance(args[1], int) else None)
                                 if hint and hint != last_hint:
                                     print(json.dumps({"status": "hint", "stage": stage, "message": hint}))
                                     sys.stdout.flush()
@@ -415,18 +446,10 @@ def delete_finger(finger):
             FPRINTD_INTERFACE
         )
 
-        # Try singular first (DeleteEnrolledFinger), fall back to plural which deletes all
-        # Check introspection would be ideal, but try/catch is pragmatic
-        try:
-            device.DeleteEnrolledFinger(finger)
-        except dbus.DBusException as e:
-            # If singular not found, try plural signature that takes username (older API)
-            # But to avoid deleting all, check error
-            err_str = str(e)
-            if "UnknownMethod" in err_str or "No such method" in err_str:
-                # Fallback: DeleteEnrolledFingers with finger arg may not exist; warn
-                raise
-            raise
+        # DeleteEnrolledFinger(finger) exists on fprintd >= 1.90. Older API only
+        # has DeleteEnrolledFingers(username) which deletes ALL fingers — we
+        # deliberately do NOT fall back to it to avoid wiping every enrollment.
+        device.DeleteEnrolledFinger(finger)
         result["success"] = True
 
     except Exception as e:

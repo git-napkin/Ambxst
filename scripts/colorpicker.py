@@ -95,7 +95,7 @@ def main():
         Path(icon).unlink(missing_ok=True)
     except Exception:
         pass
-    atexit.register(lambda: Path(icon).unlink(missing_ok=True))
+    atexit.register(lambda: icon and Path(icon).unlink(missing_ok=True))
 
     try:
         if magick_cmd == "magick":

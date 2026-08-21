@@ -7,6 +7,8 @@ import "../../config/KeybindActions.js" as KeybindActions
 QtObject {
     id: root
 
+    property int _batchRetries: 0
+
     property Process compositorProcess: Process {
         stdout: StdioCollector {
             onStreamFinished: {
@@ -22,10 +24,17 @@ QtObject {
         }
         onExited: (code, status) => {
             if (code !== 0 || status !== 0) {
-                console.warn("CompositorKeybinds: keybinds-batch failed code=" + code + " status=" + status + " – will retry in 500ms");
-                // Retry once – Hyprland may have been restarting
-                if (!retryTimer.running) retryTimer.restart();
+                // Bounded retry — covers Hyprland restart races without
+                // spinning forever if axctl is permanently broken.
+                if (_batchRetries < 3) {
+                    _batchRetries++;
+                    console.warn("CompositorKeybinds: keybinds-batch failed code=" + code + " status=" + status + " – retry " + _batchRetries + "/3 in 500ms");
+                    if (!retryTimer.running) retryTimer.restart();
+                } else {
+                    console.warn("CompositorKeybinds: keybinds-batch failed " + _batchRetries + " times, giving up until next trigger");
+                }
             } else {
+                _batchRetries = 0;
                 console.log("CompositorKeybinds: keybinds-batch succeeded");
             }
         }

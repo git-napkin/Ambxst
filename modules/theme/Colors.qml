@@ -85,9 +85,9 @@ FileView {
         repeat: false
         onTriggered: {
             const input = (colors.text() || "") + "|oled:" + Config.oledMode + "|light:" + Config.lightMode + "|bg:" + (Config.theme.srBg ? Config.theme.srBg.opacity : 0);
-            if (input !== "" && input === root._lastGenerationInput)
+            if (input !== "" && input === colors._lastGenerationInput)
                 return;
-            root._lastGenerationInput = input;
+            colors._lastGenerationInput = input;
             qtCtGenerator.generate(colors);
             gtkGenerator.generate(colors);
             pywalGenerator.generate(colors);

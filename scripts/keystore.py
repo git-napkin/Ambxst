@@ -30,10 +30,12 @@ def get_machine_id():
             # Atomic write with 0o600
             fd = os.open(str(fallback_path), os.O_WRONLY | os.O_CREAT | os.O_EXCL, 0o600)
             try:
-                os.write(fd, base64.b64encode(salt))
+                encoded = base64.b64encode(salt)
+                os.write(fd, encoded)
             finally:
                 os.close(fd)
-            return salt
+            # Return exactly what was persisted so later runs derive the same key
+            return encoded
         except Exception:
             return base64.b64encode(os.urandom(32))
 
