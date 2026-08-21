@@ -288,10 +288,7 @@ refresh)
 	exec nix profile upgrade 'ambxst.*' --refresh --impure
 	;;
 run)
-	shift 2 2>/dev/null || {
-		echo "Error: No command specified for run"
-		exit 1
-	}
+	shift
 	CMD="$*"
 	PIPE="/tmp/ambxst+_ipc.pipe"
 
