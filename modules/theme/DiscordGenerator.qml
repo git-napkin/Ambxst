@@ -6,8 +6,34 @@ import qs.config
 QtObject {
     id: root
 
+    property var pendingPalette
+    property string requestedFont: ""
+
+    function escape(str) {
+        if (!str) return ""
+        return str.toString()
+            .replace(/\\/g, "\\\\")
+            .replace(/"/g, '\\"')
+            .replace(/\$/g, '\\$')
+            .replace(/`/g, '\\`');
+    }
+
     function generate(Colors) {
         if (!Colors) return
+
+        pendingPalette = Colors
+        requestedFont = Config.theme.font || "gg sans"
+
+        fontCheckProcess.command = ["sh", "-c", `fc-match --format "%{scalable}" "${escape(requestedFont)}"`]
+        fontCheckProcess.running = true
+    }
+
+    function writeTheme() {
+        const Colors = pendingPalette
+        if (!Colors) return
+
+        const scalable = fontCheckCollector.text.trim().toLowerCase() === "true"
+        const font = scalable ? requestedFont : "gg sans"
 
         const toRGB = (c) => {
             return `${Math.round(c.r * 255)},${Math.round(c.g * 255)},${Math.round(c.b * 255)}`
@@ -18,8 +44,6 @@ QtObject {
         const linkcolor = toRGB(Colors.blue)
         const mentioncolor = toRGB(Colors.yellow)
         
-        const font = Config.theme.font || "gg sans"
-
         const isLight = Config.theme.lightMode
         
         // Background derivatives
@@ -80,15 +104,6 @@ QtObject {
 
         const home = Quickshell.env("HOME")
         const vesktopPath = home + "/.config/vesktop/themes/ambxst+.css"
-        
-        const escape = (str) => {
-            if (!str) return ""
-            return str.toString()
-                .replace(/\\/g, "\\\\")
-                .replace(/"/g, '\\"')
-                .replace(/\$/g, '\\$')
-                .replace(/`/g, '\\`');
-        }
 
         const cmd = `mkdir -p "$(dirname "${vesktopPath}")" && echo "${escape(css)}" > "${vesktopPath}"`
         
@@ -99,6 +114,23 @@ QtObject {
     property QtObject writer: QtObject {
         id: writer
         property string text
+    }
+
+    property Process fontCheckProcess: Process {
+        id: fontCheckProcess
+        running: false
+        stdout: StdioCollector {
+            id: fontCheckCollector
+            onStreamFinished: root.writeTheme()
+        }
+        stderr: StdioCollector {
+            onStreamFinished: (err) => {
+                if (err) {
+                    const text = err.toString().trim();
+                    if (text) console.error("DiscordGenerator Error:", text)
+                }
+            }
+        }
     }
 
     property Process writerProcess: Process {
