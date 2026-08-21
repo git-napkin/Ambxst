@@ -102,6 +102,8 @@ Singleton {
         LockscreenService.toString();
         // Fetch the active layout from the compositor
         getLayoutProcess.running = true;
+        // Seed assistant state if config already loaded (race guard)
+        _seedAssistantFromConfig();
     }
 
     // Persistent launcher state across monitors
@@ -241,6 +243,8 @@ Singleton {
     readonly property var _simpleThemeProps: [
         "roundness", "oledMode", "lightMode", "font", "fontSize", "monoFont", "monoFontSize",
         "tintIcons", "enableCorners", "animDuration",
+        "animInstant", "animQuick", "animStandard", "animConsidered", "animCinematic",
+        "animEasingOut", "animEasingIn", "animEasingInOut",
         "shadowOpacity", "shadowColor", "shadowXOffset", "shadowYOffset", "shadowBlur"
     ]
     readonly property var _srVariantProps: [
@@ -381,15 +385,16 @@ Singleton {
     property var shellSnapshot: null
 
     // Shell config sections and their properties
+    // Must stay in sync with Config.qml adapters + defaults/*.js blueprints.
     readonly property var _shellSections: {
-        "bar": ["position", "launcherIcon", "launcherIconTint", "launcherIconFullTint", "launcherIconSize", "enableFirefoxPlayer", "screenList", "frameEnabled", "frameThickness", "pinnedOnStartup", "hoverToReveal", "hoverRegionHeight", "showPinButton", "availableOnFullscreen", "pillStyle", "use12hFormat", "containBar", "keepBarShadow", "keepBarBorder"],
-        "notch": ["theme", "position", "hoverRegionHeight", "keepHidden"],
+        "bar": ["position", "launcherIcon", "launcherIconTint", "launcherIconFullTint", "launcherIconSize", "enableFirefoxPlayer", "screenList", "barColor", "frameEnabled", "frameThickness", "pinnedOnStartup", "hoverToReveal", "hoverRegionHeight", "showPinButton", "availableOnFullscreen", "pillStyle", "use12hFormat", "containBar", "keepBarShadow", "keepBarBorder"],
+        "notch": ["theme", "position", "hoverRegionHeight", "keepHidden", "noMediaDisplay", "customText", "disableHoverExpansion", "noMediaBackground", "noMediaBackgroundImage", "noMediaBackgroundBlur"],
         "workspaces": ["shown", "showAppIcons", "alwaysShowNumbers", "showNumbers", "dynamic"],
-        "overview": ["rows", "columns", "scale", "workspaceSpacing"],
-        "dock": ["enabled", "theme", "position", "height", "iconSize", "spacing", "margin", "hoverRegionHeight", "pinnedOnStartup", "hoverToReveal", "availableOnFullscreen", "showRunningIndicators", "showPinButton", "showOverviewButton", "screenList", "keepHidden"],
-        "lockscreen": ["position"],
+        "overview": ["enabled", "rows", "columns", "scale", "workspaceSpacing"],
+        "dock": ["enabled", "theme", "position", "height", "iconSize", "spacing", "margin", "hoverRegionHeight", "pinnedOnStartup", "hoverToReveal", "availableOnFullscreen", "showRunningIndicators", "showPinButton", "showOverviewButton", "screenList", "keepHidden", "ignoredAppRegexes"],
+        "lockscreen": ["position", "enableFingerprint", "fingerprintAutoStart", "fingerprintTimeout", "fingerprintFallbackToPassword", "fingerprintShowEnrollPrompt", "requireAuthForDashboard", "authMethod"],
         "desktop": ["enabled", "iconSize", "spacingVertical", "textColor"],
-        "system": ["idle", "ocr"]
+        "system": ["disks", "updateServiceEnabled", "idle", "ocr", "pomodoro"]
     }
 
     // Create a deep copy of the current shell config
@@ -500,7 +505,9 @@ Singleton {
     property var compositorSnapshot: null
 
     // Compositor config properties (AxctlService)
+    // Must stay in sync with defaults/compositor.js + Config.qml adapter.
     readonly property var _compositorProps: [
+        "layout",
         "syncBorderWidth", "borderSize",
         "syncRoundness", "rounding",
         "gapsIn", "gapsOut",
@@ -509,13 +516,14 @@ Singleton {
         "shadowEnabled", "syncShadowColor", "syncShadowOpacity",
         "shadowRange", "shadowRenderPower", "shadowScale",
         "shadowOpacity", "shadowSharp", "shadowIgnoreWindow",
+        "shadowColor", "shadowColorInactive",
         "blurEnabled", "blurSize", "blurPasses", "blurXray",
         "blurNewOptimizations", "blurIgnoreOpacity",
         "blurNoise", "blurContrast", "blurBrightness", "blurVibrancy",
         "blurVibrancyDarkness", "blurSpecial", "blurPopups", "blurPopupsIgnorealpha",
         "blurInputMethods", "blurInputMethodsIgnorealpha",
         "blurExplicitIgnoreAlpha", "blurIgnoreAlphaValue",
-        "shadowOffset", "shadowColorInactive",
+        "shadowOffset",
         "switchToActivatedWorkspace"
     ]
 
@@ -591,14 +599,18 @@ Singleton {
     property string assistantPosition: "right"
     property string assistantScreenName: ""
 
+    function _seedAssistantFromConfig() {
+        if (Config.initialLoadComplete) {
+            root.assistantPinned = Config.ai.sidebarPinnedOnStartup ?? false;
+            root.assistantWidth = Config.ai.sidebarWidth ?? 400;
+            root.assistantPosition = Config.ai.sidebarPosition ?? "right";
+        }
+    }
+
     Connections {
         target: Config
         function onInitialLoadCompleteChanged() {
-            if (Config.initialLoadComplete) {
-                root.assistantPinned = Config.ai.sidebarPinnedOnStartup ?? false;
-                root.assistantWidth = Config.ai.sidebarWidth ?? 400;
-                root.assistantPosition = Config.ai.sidebarPosition ?? "right";
-            }
+            _seedAssistantFromConfig();
         }
     }
 

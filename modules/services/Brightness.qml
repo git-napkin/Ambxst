@@ -18,6 +18,9 @@ Singleton {
     signal brightnessChanged(real value, var screen)
 
     property var ddcMonitors: []
+    // Track monitors to destroy them on hotplug — otherwise each
+    // Quickshell.screens change leaks parented QObjects.
+    property var _prevMonitors: []
     readonly property list<BrightnessMonitor> monitors: Quickshell.screens.map(screen => monitorComp.createObject(root, {
             screen
         }))
@@ -77,9 +80,23 @@ Singleton {
     reloadableId: "brightness"
 
     onMonitorsChanged: {
+        // Destroy previous monitors to avoid leak
+        for (let i = 0; i < _prevMonitors.length; ++i) {
+            const mon = _prevMonitors[i];
+            if (mon) {
+                // Defer destroy so current binding evaluation finishes
+                const toDestroy = mon;
+                Qt.callLater(() => toDestroy.destroy());
+            }
+        }
+        _prevMonitors = monitors.slice(0);
         ddcMonitors = [];
         // Debounce detection to avoid multiple processes during wake/screen changes
         ddcDetectTimer.restart();
+    }
+
+    Component.onCompleted: {
+        _prevMonitors = monitors.slice(0);
     }
 
     Timer {
@@ -138,10 +155,6 @@ Singleton {
             }
         }
         onExited: root.ddcMonitorsChanged()
-    }
-
-    Process {
-        id: setProc
     }
 
     component BrightnessMonitor: QtObject {
@@ -240,6 +253,10 @@ Singleton {
             }
         }
 
+        // Per-monitor process to avoid shared setProc race when
+        // syncBrightness(true) sets multiple monitors rapidly.
+        readonly property Process setProc: Process {}
+
         function syncBrightness() {
             if (isDdc && !busNum)
                 return;
@@ -272,12 +289,12 @@ Singleton {
     IpcHandler {
         target: "brightness"
 
-        function increment() {
-            onPressed: root.increaseBrightness();
+        function increment(): void {
+            root.increaseBrightness();
         }
 
-        function decrement() {
-            onPressed: root.decreaseBrightness();
+        function decrement(): void {
+            root.decreaseBrightness();
         }
 
         function set(value: real, monitorName: string) {

@@ -14,6 +14,9 @@ Usage:
 import sys
 import json
 import os
+import re
+import time
+import pwd
 
 sys.stdout.reconfigure(line_buffering=True)
 
@@ -24,15 +27,88 @@ except ImportError:
     HAS_DBUS = False
 
 FPRINTD_SERVICE = "net.reactivated.Fprint"
+FPRINTD_MANAGER_PATH = "/net/reactivated/Fprint/Manager"
+FPRINTD_MANAGER_IFACE = "net.reactivated.Fprint.Manager"
 FPRINTD_PATH = "/net/reactivated/Fprint/Device/0"
 FPRINTD_INTERFACE = "net.reactivated.Fprint.Device"
 
+ENROLL_HINTS = {
+    2: "Scan failed — try again",
+    3: "Retry the scan",
+    4: "Finger moved too quickly — try again",
+    5: "Center your finger on the sensor",
+    6: "Lift your finger and try again",
+    7: "Swipe was too short — try again",
+    8: "Sensor disconnected",
+}
+
 
 def get_bus():
-    """Get D-Bus session bus."""
-    if HAS_DBUS:
+    """Get D-Bus bus — fprintd is a system service, try SystemBus first."""
+    if not HAS_DBUS:
+        return None
+    # Prefer SystemBus (fprintd is system service)
+    try:
+        bus = dbus.SystemBus()
+        # Quick check that we can connect
+        return bus
+    except Exception:
+        pass
+    try:
         return dbus.SessionBus()
-    return None
+    except Exception:
+        return None
+
+
+def _get_device_path(bus):
+    """Resolve device path via Manager.GetDefaultDevice, fallback to Device/0."""
+    try:
+        manager = dbus.Interface(
+            bus.get_object(FPRINTD_SERVICE, FPRINTD_MANAGER_PATH),
+            FPRINTD_MANAGER_IFACE,
+        )
+        # GetDevices returns array; GetDefaultDevice returns single path
+        try:
+            path = manager.GetDefaultDevice()
+            if path:
+                return str(path)
+        except dbus.DBusException:
+            pass
+        try:
+            devices = manager.GetDevices()
+            if devices and len(devices) > 0:
+                return str(devices[0])
+        except dbus.DBusException:
+            pass
+    except Exception:
+        pass
+    return FPRINTD_PATH
+
+
+def _get_username():
+    """Get current username securely (don't trust $USER which can be spoofed)."""
+    try:
+        return pwd.getpwuid(os.getuid()).pw_name
+    except Exception:
+        return os.environ.get("USER", "")
+
+
+def _parse_finger_list(fingers):
+    """Normalize fprintd finger list (array of strings) to Python list[str]."""
+    if not fingers:
+        return []
+    result = []
+    # dbus may return array of dbus.String or plain str
+    for f in fingers:
+        if isinstance(f, (list, tuple)):
+            for item in f:
+                result.append(str(item))
+        else:
+            result.append(str(f))
+    # Filter to valid finger names
+    valid = re.compile(r"^[a-z-]+$")
+    # Don't strictly filter; keep whatever fprintd returns
+    return result
 
 
 def check_available():
@@ -52,7 +128,7 @@ def check_available():
     try:
         bus = get_bus()
         if bus is None:
-            result["error"] = "Failed to get D-Bus session bus"
+            result["error"] = "Failed to get D-Bus bus"
             print(json.dumps(result))
             return
 
@@ -63,20 +139,14 @@ def check_available():
 
         result["available"] = True
 
+        device_path = _get_device_path(bus)
         device = dbus.Interface(
-            bus.get_object(FPRINTD_SERVICE, FPRINTD_PATH),
+            bus.get_object(FPRINTD_SERVICE, device_path),
             FPRINTD_INTERFACE
         )
 
         fingers = device.ListEnrolledFingers()
-        finger_list = []
-        for f in fingers:
-            if isinstance(f, dbus.String):
-                finger_list.append(str(f))
-            elif isinstance(f, (list, tuple)):
-                for item in f:
-                    if isinstance(item, dbus.String):
-                        finger_list.append(str(item))
+        finger_list = _parse_finger_list(fingers)
 
         result["fingers"] = finger_list
         result["enrolled"] = len(finger_list) > 0
@@ -103,7 +173,7 @@ def verify_finger():
     try:
         bus = get_bus()
         if bus is None:
-            result["error"] = "Failed to get D-Bus session bus"
+            result["error"] = "Failed to get D-Bus bus"
             print(json.dumps(result))
             return
 
@@ -112,27 +182,33 @@ def verify_finger():
             print(json.dumps(result))
             return
 
+        device_path = _get_device_path(bus)
         device = dbus.Interface(
-            bus.get_object(FPRINTD_SERVICE, FPRINTD_PATH),
+            bus.get_object(FPRINTD_SERVICE, device_path),
             FPRINTD_INTERFACE
         )
 
-        username = os.environ.get("USER", "")
+        username = _get_username()
         if username:
-            device.SetUsername(username)
+            try:
+                device.SetUsername(username)
+            except dbus.DBusException:
+                pass
 
         fingers = device.ListEnrolledFingers()
-        if not fingers:
+        finger_list = _parse_finger_list(fingers)
+        if not finger_list:
             result["error"] = "No fingers enrolled"
             print(json.dumps(result))
             return
 
-        first_finger = str(fingers[0]) if fingers else ""
+        first_finger = finger_list[0]
         result["finger"] = first_finger
 
-        ret = device.VerifyStart(first_finger)
-        if ret != 0:
-            result["error"] = f"VerifyStart failed with code {ret}"
+        try:
+            device.VerifyStart(first_finger)
+        except dbus.DBusException as e:
+            result["error"] = f"VerifyStart failed: {e}"
             print(json.dumps(result))
             return
 
@@ -153,12 +229,8 @@ def verify_finger():
                         args = msg.get_args_list()
                         if len(args) >= 2:
                             done = bool(args[0])
-                            # fprintd >= 1.90: (done, result); < 1.90: (done, result_code)
                             result_code = args[1] if isinstance(args[1], int) else None
                             if done:
-                                # VERIFY_SUCCESS is 1 (older signature) — in the
-                                # string-signature version done==True always
-                                # means a match.
                                 success = (result_code == 1) if result_code is not None else True
                             else:
                                 hint = ENROLL_HINTS.get(result_code)
@@ -169,11 +241,12 @@ def verify_finger():
                     msg = bus.pop_message()
 
                 if not done:
-                    import time
                     time.sleep(0.1)
                     timeout_count += 0.1
+            except dbus.DBusException:
+                time.sleep(0.1)
+                timeout_count += 0.1
             except Exception:
-                import time
                 time.sleep(0.1)
                 timeout_count += 0.1
 
@@ -195,19 +268,13 @@ def verify_finger():
     print(json.dumps(result))
 
 
-ENROLL_HINTS = {
-    2: "Scan failed — try again",
-    3: "Retry the scan",
-    4: "Finger moved too quickly — try again",
-    5: "Center your finger on the sensor",
-    6: "Lift your finger and try again",
-    7: "Swipe was too short — try again",
-    8: "Sensor disconnected",
-}
-
-
 def enroll_finger(finger):
     """Enroll a new finger."""
+    # Validate finger name
+    if not re.match(r"^[a-z-]+$", finger):
+        print(json.dumps({"success": False, "error": "Invalid finger name", "finger": finger}))
+        return
+
     result = {
         "success": False,
         "error": None,
@@ -222,7 +289,7 @@ def enroll_finger(finger):
     try:
         bus = get_bus()
         if bus is None:
-            result["error"] = "Failed to get D-Bus session bus"
+            result["error"] = "Failed to get D-Bus bus"
             print(json.dumps(result))
             return
 
@@ -231,18 +298,23 @@ def enroll_finger(finger):
             print(json.dumps(result))
             return
 
+        device_path = _get_device_path(bus)
         device = dbus.Interface(
-            bus.get_object(FPRINTD_SERVICE, FPRINTD_PATH),
+            bus.get_object(FPRINTD_SERVICE, device_path),
             FPRINTD_INTERFACE
         )
 
-        username = os.environ.get("USER", "")
+        username = _get_username()
         if username:
-            device.SetUsername(username)
+            try:
+                device.SetUsername(username)
+            except dbus.DBusException:
+                pass
 
-        ret = device.EnrollStart(finger)
-        if ret != 0:
-            result["error"] = f"EnrollStart failed with code {ret}"
+        try:
+            device.EnrollStart(finger)
+        except dbus.DBusException as e:
+            result["error"] = f"EnrollStart failed: {e}"
             print(json.dumps(result))
             return
 
@@ -264,8 +336,6 @@ def enroll_finger(finger):
                         args = msg.get_args_list()
                         if len(args) >= 2:
                             done = bool(args[0])
-                            # fprintd >= 1.90: (done, result, result_code)
-                            # fprintd < 1.90:  (done, result_code, result)
                             result_code = None
                             if len(args) >= 3 and isinstance(args[2], int):
                                 result_code = int(args[2])
@@ -275,7 +345,6 @@ def enroll_finger(finger):
                             if done:
                                 success = (result_code == 0 if result_code is not None else True)
                             elif result_code == 1:
-                                # ENROLL_STAGE_PASSED — one full scan done
                                 stage += 1
                                 print(json.dumps({"status": "scanning", "stage": stage, "message": "Lift and replace your finger"}))
                                 sys.stdout.flush()
@@ -288,11 +357,12 @@ def enroll_finger(finger):
                     msg = bus.pop_message()
 
                 if not done:
-                    import time
                     time.sleep(0.1)
                     timeout_count += 0.1
+            except dbus.DBusException:
+                time.sleep(0.1)
+                timeout_count += 0.1
             except Exception:
-                import time
                 time.sleep(0.1)
                 timeout_count += 0.1
 
@@ -312,6 +382,10 @@ def enroll_finger(finger):
 
 def delete_finger(finger):
     """Delete an enrolled finger."""
+    if not re.match(r"^[a-z-]+$", finger):
+        print(json.dumps({"success": False, "error": "Invalid finger name", "finger": finger}))
+        return
+
     result = {
         "success": False,
         "error": None,
@@ -326,7 +400,7 @@ def delete_finger(finger):
     try:
         bus = get_bus()
         if bus is None:
-            result["error"] = "Failed to get D-Bus session bus"
+            result["error"] = "Failed to get D-Bus bus"
             print(json.dumps(result))
             return
 
@@ -335,12 +409,24 @@ def delete_finger(finger):
             print(json.dumps(result))
             return
 
+        device_path = _get_device_path(bus)
         device = dbus.Interface(
-            bus.get_object(FPRINTD_SERVICE, FPRINTD_PATH),
+            bus.get_object(FPRINTD_SERVICE, device_path),
             FPRINTD_INTERFACE
         )
 
-        device.DeleteEnrolledFingers(finger)
+        # Try singular first (DeleteEnrolledFinger), fall back to plural which deletes all
+        # Check introspection would be ideal, but try/catch is pragmatic
+        try:
+            device.DeleteEnrolledFinger(finger)
+        except dbus.DBusException as e:
+            # If singular not found, try plural signature that takes username (older API)
+            # But to avoid deleting all, check error
+            err_str = str(e)
+            if "UnknownMethod" in err_str or "No such method" in err_str:
+                # Fallback: DeleteEnrolledFingers with finger arg may not exist; warn
+                raise
+            raise
         result["success"] = True
 
     except Exception as e:
@@ -365,7 +451,7 @@ def list_fingers():
     try:
         bus = get_bus()
         if bus is None:
-            result["error"] = "Failed to get D-Bus session bus"
+            result["error"] = "Failed to get D-Bus bus"
             print(json.dumps(result))
             return
 
@@ -376,22 +462,14 @@ def list_fingers():
 
         result["available"] = True
 
+        device_path = _get_device_path(bus)
         device = dbus.Interface(
-            bus.get_object(FPRINTD_SERVICE, FPRINTD_PATH),
+            bus.get_object(FPRINTD_SERVICE, device_path),
             FPRINTD_INTERFACE
         )
 
         fingers = device.ListEnrolledFingers()
-        finger_list = []
-        for f in fingers:
-            if isinstance(f, dbus.String):
-                finger_list.append(str(f))
-            elif isinstance(f, (list, tuple)):
-                for item in f:
-                    if isinstance(item, dbus.String):
-                        finger_list.append(str(item))
-
-        result["fingers"] = finger_list
+        result["fingers"] = _parse_finger_list(fingers)
 
     except Exception as e:
         result["error"] = str(e)

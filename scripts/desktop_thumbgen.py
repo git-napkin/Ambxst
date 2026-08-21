@@ -36,13 +36,24 @@ class DesktopThumbnailGenerator:
     def find_files(self) -> Tuple[List[Path], List[Path]]:
         videos = []
         images = []
-        
+
         if not self.desktop_path.exists():
             print(f"ERROR: Desktop path not found: {self.desktop_path}")
             return [], []
-        
+
+        # Validate not symlink escape and not hidden leakage
+        try:
+            resolved = self.desktop_path.resolve()
+        except Exception:
+            resolved = self.desktop_path
+
         try:
             for file_path in self.desktop_path.iterdir():
+                # Skip symlinks to avoid traversal outside desktop dir
+                if file_path.is_symlink():
+                    continue
+                if file_path.name.startswith("."):
+                    continue
                 if file_path.is_file():
                     ext = file_path.suffix.lower()
                     if ext in VIDEO_EXTENSIONS:
@@ -61,7 +72,9 @@ class DesktopThumbnailGenerator:
             return [], []
     
     def get_thumbnail_path(self, file_path: Path) -> Path:
-        thumbnail_name = file_path.name.replace(file_path.suffix, '') + file_path.suffix + '.jpg'
+        # Use .name + ".jpg" to avoid replace() bug (replaces all occurrences)
+        # e.g. "a.png.png".replace(".png","") -> "a" wrong; here we want "a.png.png.jpg"
+        thumbnail_name = file_path.name + ".jpg"
         return self.cache_dir / thumbnail_name
     
     def needs_thumbnail(self, file_path: Path) -> bool:
@@ -79,17 +92,28 @@ class DesktopThumbnailGenerator:
     
     def generate_video_thumbnail(self, video_path: Path) -> Tuple[bool, str]:
         thumbnail_path = self.get_thumbnail_path(video_path)
-        
+        # Guard leading dash filenames
+        wp = str(video_path)
+        out = str(thumbnail_path)
+        if os.path.basename(wp).startswith("-"):
+            wp = os.path.join(os.path.dirname(wp) or ".", "./" + os.path.basename(wp))
+        if os.path.basename(out).startswith("-"):
+            out = os.path.join(os.path.dirname(out) or ".", "./" + os.path.basename(out))
+        # Ensure parent dir
+        try:
+            Path(out).parent.mkdir(parents=True, exist_ok=True)
+        except Exception:
+            pass
         try:
             cmd = [
                 'ffmpeg', '-y',
-                '-i', str(video_path),
+                '-i', wp,
                 '-ss', '00:00:01',
                 '-vframes', '1',
                 '-vf', f'scale=64:64:force_original_aspect_ratio=increase,crop=64:64',
                 '-q:v', '2',
                 '-f', 'image2',
-                str(thumbnail_path)
+                out
             ]
             
             result = subprocess.run(
@@ -112,17 +136,23 @@ class DesktopThumbnailGenerator:
     
     def generate_image_thumbnail(self, image_path: Path) -> Tuple[bool, str]:
         thumbnail_path = self.get_thumbnail_path(image_path)
-        
+        ip = str(image_path)
+        out = str(thumbnail_path)
+        if os.path.basename(ip).startswith("-"):
+            ip = os.path.join(os.path.dirname(ip) or ".", "./" + os.path.basename(ip))
+        if os.path.basename(out).startswith("-"):
+            out = os.path.join(os.path.dirname(out) or ".", "./" + os.path.basename(out))
         try:
-            cmd = [
-                'convert',
-                str(image_path),
-                '-resize', '64x64^',
-                '-gravity', 'center',
-                '-extent', '64x64',
-                '-quality', '85',
-                str(thumbnail_path)
-            ]
+            Path(out).parent.mkdir(parents=True, exist_ok=True)
+        except Exception:
+            pass
+        try:
+            # Use magick if available, fallback to convert
+            import shutil
+            conv = "magick" if shutil.which("magick") else "convert"
+            base = [conv] if conv == "magick" else ["convert"]
+            # For magick, need: magick <input> ... <output>
+            cmd = base + [ip, '-resize', '64x64^', '-gravity', 'center', '-extent', '64x64', '-quality', '85', out]
             
             result = subprocess.run(
                 cmd,

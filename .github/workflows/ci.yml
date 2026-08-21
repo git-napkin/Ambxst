@@ -21,7 +21,7 @@ jobs:
             experimental-features = nix-command flakes
 
       - name: Build
-        run: nix build .#Amboxst --no-link 2>&1 || nix build .#default --no-link
+        run: nix build .#ambxstPlus --no-link 2>&1 || nix build .#default --no-link
 
       - name: Check flake
         run: nix flake check

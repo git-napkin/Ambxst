@@ -14,9 +14,28 @@ from cryptography.hazmat.primitives.kdf.pbkdf2 import PBKDF2HMAC
 def get_machine_id():
     try:
         with open("/etc/machine-id", "r") as f:
-            return f.read().strip().encode("utf-8")
+            mid = f.read().strip()
+            if mid:
+                return mid.encode("utf-8")
+            raise ValueError("empty machine-id")
     except Exception:
-        return b"ambxst+-fallback-salt-82741"
+        # Use persistent per-user fallback instead of constant
+        fallback_path = Path.home() / ".config" / "ambxst+" / ".keystore_salt"
+        try:
+            if fallback_path.exists():
+                fallback_path.chmod(0o600)
+                return fallback_path.read_bytes().strip()
+            fallback_path.parent.mkdir(parents=True, exist_ok=True)
+            salt = os.urandom(32)
+            # Atomic write with 0o600
+            fd = os.open(str(fallback_path), os.O_WRONLY | os.O_CREAT | os.O_EXCL, 0o600)
+            try:
+                os.write(fd, base64.b64encode(salt))
+            finally:
+                os.close(fd)
+            return salt
+        except Exception:
+            return base64.b64encode(os.urandom(32))
 
 
 def _derive_key(machine_key, salt):
@@ -36,14 +55,27 @@ def encrypt(text, machine_key):
     return base64.b64encode(salt + token).decode("utf-8")
 
 
+_LEGACY_FALLBACK_KEY = b"ambxst+-fallback-salt-82741"
+
+def _try_decrypt(hex_str, machine_key):
+    raw = base64.b64decode(hex_str)
+    if len(raw) < 17:
+        raise ValueError("too short")
+    salt = raw[:16]
+    payload = raw[16:]
+    key = _derive_key(machine_key, salt)
+    return Fernet(key).decrypt(payload).decode("utf-8")
+
 def decrypt(hex_str, machine_key):
     try:
-        raw = base64.b64decode(hex_str)
-        salt = raw[:16]
-        payload = raw[16:]
-        key = _derive_key(machine_key, salt)
-        return Fernet(key).decrypt(payload).decode("utf-8")
+        return _try_decrypt(hex_str, machine_key)
     except Exception:
+        # Compatibility: try legacy constant if current key fails
+        try:
+            if machine_key != _LEGACY_FALLBACK_KEY:
+                return _try_decrypt(hex_str, _LEGACY_FALLBACK_KEY)
+        except Exception:
+            pass
         return ""
 
 
@@ -52,17 +84,73 @@ def main():
         print(json.dumps({"error": "Usage: <db_path> <cmd> [args...]"}), flush=True)
         sys.exit(1)
 
-    db_path = Path(os.path.expanduser(sys.argv[1]))
+    db_path = Path(os.path.expanduser(sys.argv[1])).resolve()
     cmd = sys.argv[2]
     args = sys.argv[3:]
 
-    # Ensure parent directory exists
-    db_path.parent.mkdir(parents=True, exist_ok=True)
-
+    # Validate path stays under ~/.config/ambxst+ (or $XDG_CONFIG_HOME/ambxst+)
+    allowed_roots = []
     try:
-        conn = sqlite3.connect(str(db_path))
-        # Secure the file
-        os.chmod(str(db_path), 0o600)
+        allowed_roots.append((Path.home() / ".config" / "ambxst+").resolve())
+    except Exception:
+        pass
+    xdg = os.environ.get("XDG_CONFIG_HOME")
+    if xdg:
+        try:
+            allowed_roots.append(Path(xdg).expanduser().resolve() / "ambxst+")
+        except Exception:
+            pass
+    # Check relative_to any allowed root
+    _allowed = False
+    for ar in allowed_roots:
+        try:
+            db_path.relative_to(ar)
+            _allowed = True
+            break
+        except ValueError:
+            continue
+        except Exception:
+            continue
+    if not _allowed:
+        print(json.dumps({"error": "db_path outside allowed directory"}), flush=True)
+        sys.exit(1)
+
+    # Reject symlink parent to prevent symlink attack
+    if db_path.is_symlink():
+        print(json.dumps({"error": "db_path must not be a symlink"}), flush=True)
+        sys.exit(1)
+    if db_path.parent.is_symlink():
+        print(json.dumps({"error": "db_path parent must not be a symlink"}), flush=True)
+        sys.exit(1)
+
+    # Ensure parent directory exists with safe perms
+    try:
+        old_umask = os.umask(0o077)
+        db_path.parent.mkdir(parents=True, exist_ok=True)
+    finally:
+        try:
+            os.umask(old_umask)
+        except Exception:
+            pass
+
+    conn = None
+    try:
+        # Create file with 0o600 if it doesn't exist to avoid TOCTOU chmod race
+        if not db_path.exists():
+            fd = os.open(str(db_path), os.O_CREAT | os.O_EXCL, 0o600)
+            os.close(fd)
+        else:
+            # Ensure perms, don't follow symlink (already checked)
+            try:
+                os.chmod(str(db_path), 0o600, follow_symlinks=False)
+            except TypeError:
+                os.chmod(str(db_path), 0o600)
+
+        conn = sqlite3.connect(str(db_path), timeout=5.0, isolation_level=None)
+        try:
+            conn.execute("PRAGMA journal_mode=WAL")
+        except Exception:
+            pass
 
         cursor = conn.cursor()
         cursor.execute("""
@@ -95,7 +183,7 @@ def main():
             custom_curl = args[3] if len(args) > 3 else ""
 
             cursor.execute(
-                "INSERT OR REPLACE INTO api_keys VALUES (?, ?, ?, ?)",
+                "INSERT OR REPLACE INTO api_keys (provider, api_key, endpoint, custom_curl) VALUES (?, ?, ?, ?)",
                 (provider, api_key, endpoint, custom_curl),
             )
             conn.commit()
@@ -106,7 +194,7 @@ def main():
                 print(json.dumps({"error": "get requires <provider>"}), flush=True)
                 sys.exit(1)
 
-            cursor.execute("SELECT * FROM api_keys WHERE provider = ?", (args[0],))
+            cursor.execute("SELECT provider, api_key, endpoint, custom_curl FROM api_keys WHERE provider = ?", (args[0],))
             row = cursor.fetchone()
             if row:
                 res = {
@@ -131,7 +219,7 @@ def main():
             print(json.dumps({"status": "ok"}), flush=True)
 
         elif cmd == "list":
-            cursor.execute("SELECT * FROM api_keys")
+            cursor.execute("SELECT provider, api_key, endpoint, custom_curl FROM api_keys")
             rows = cursor.fetchall()
             results = []
             for row in rows:
@@ -156,11 +244,17 @@ def main():
             print(json.dumps({"error": f"Unknown command: {cmd}"}), flush=True)
             sys.exit(1)
 
-        conn.close()
-
     except Exception as e:
-        print(json.dumps({"error": str(e)}), flush=True)
+        # Sanitize error for UI; log details to stderr
+        print(json.dumps({"error": "internal error"}), flush=True)
+        print(f"keystore error: {e}", file=sys.stderr, flush=True)
         sys.exit(1)
+    finally:
+        if conn is not None:
+            try:
+                conn.close()
+            except Exception:
+                pass
 
 
 if __name__ == "__main__":

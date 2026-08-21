@@ -95,13 +95,73 @@ def fetch_twitter_metadata(url, timeout=5):
 
 
 def is_youtube_url(url):
-    """Check if URL is a YouTube URL."""
-    return "youtube.com" in url or "youtu.be" in url
+    """Check if URL is a YouTube URL (hostname based)."""
+    try:
+        host = urlparse(url).netloc.lower().split(":")[0]
+        return host == "youtube.com" or host.endswith(".youtube.com") or host == "youtu.be" or host.endswith(".youtu.be")
+    except Exception:
+        return False
 
 
 def is_twitter_url(url):
-    """Check if URL is a Twitter/X URL."""
-    return "twitter.com" in url or "x.com" in url
+    """Check if URL is a Twitter/X URL (hostname based)."""
+    try:
+        host = urlparse(url).netloc.lower().split(":")[0]
+        return host == "twitter.com" or host.endswith(".twitter.com") or host == "x.com" or host.endswith(".x.com")
+    except Exception:
+        return False
+
+
+# SSRF protection: whitelist and private-range block
+def _is_private_ip(host):
+    import ipaddress
+    import socket
+    try:
+        # Resolve hostname
+        infos = socket.getaddrinfo(host, None)
+        for family, _, _, _, sockaddr in infos:
+            ip_str = sockaddr[0]
+            try:
+                ip = ipaddress.ip_address(ip_str)
+                if ip.is_private or ip.is_loopback or ip.is_link_local or ip.is_reserved or ip.is_multicast:
+                    return True
+                # Explicit 169.254/16, cg nat etc already covered by private/link_local but double-check
+                if ip.is_private:
+                    return True
+            except ValueError:
+                continue
+        return False
+    except Exception:
+        # If resolution fails, don't block (could be DNS failure) — caller will handle
+        return False
+
+
+def _is_allowed_url(url):
+    try:
+        parsed = urlparse(url)
+        if parsed.scheme not in ("http", "https"):
+            return False, "Unsupported scheme"
+        if not parsed.hostname:
+            return False, "Invalid host"
+        # Block private IPs
+        if _is_private_ip(parsed.hostname):
+            return False, "Private address blocked"
+        return True, ""
+    except Exception as e:
+        return False, str(e)
+
+
+class _NoRedirectHandler(urllib.request.HTTPRedirectHandler):
+    def redirect_request(self, req, fp, code, msg, headers, newurl):
+        # Check redirect target
+        allowed, reason = _is_allowed_url(newurl)
+        if not allowed:
+            raise urllib.error.URLError(f"Redirect blocked: {reason} ({newurl})")
+        # Limit redirects to 3
+        if getattr(self, "_redirect_count", 0) >= 3:
+            raise urllib.error.URLError("Too many redirects")
+        self._redirect_count = getattr(self, "_redirect_count", 0) + 1
+        return super().redirect_request(req, fp, code, msg, headers, newurl)
 
 
 class MetaTagParser(HTMLParser):
@@ -246,10 +306,11 @@ def fetch_preview(url, timeout=5):
         Dictionary with metadata or error information
     """
     try:
-        # Validate URL
+        # Validate URL (whitelist + SSRF check)
+        allowed, reason = _is_allowed_url(url)
+        if not allowed:
+            return {"error": reason or "Invalid URL"}
         parsed = urlparse(url)
-        if not parsed.scheme or not parsed.netloc:
-            return {"error": "Invalid URL"}
 
         # Check for special URL types that have oEmbed support
         if is_youtube_url(url):
@@ -275,16 +336,28 @@ def fetch_preview(url, timeout=5):
 
         req = urllib.request.Request(url, headers=headers)
 
-        # Fetch the page (urllib follows redirects automatically)
-        with urllib.request.urlopen(req, timeout=timeout) as response:
-            # Get the final URL after redirects
+        # Use opener with redirect validation and limit
+        opener = urllib.request.build_opener(_NoRedirectHandler)
+        # Fetch the page (redirects validated)
+        with opener.open(req, timeout=timeout) as response:
+            # Get the final URL after redirects (already validated)
             final_url = response.geturl()
             final_parsed = urlparse(final_url)
 
-            # Only parse HTML content
-            content_type = response.headers.get("Content-Type", "")
-            if "text/html" not in content_type:
+            # Only parse HTML content (allow xhtml/xml)
+            content_type = response.headers.get("Content-Type", "") or ""
+            ct_lower = content_type.lower()
+            if not any(t in ct_lower for t in ("text/html", "application/xhtml", "application/xml")):
                 return {"error": "Not an HTML page"}
+
+            # Check Content-Length before reading
+            clen = response.headers.get("Content-Length")
+            if clen:
+                try:
+                    if int(clen) > 2 * 1024 * 1024:
+                        return {"error": "Content too large"}
+                except ValueError:
+                    pass
 
             # Read only first 500KB to avoid large downloads
             html = response.read(500 * 1024).decode("utf-8", errors="ignore")

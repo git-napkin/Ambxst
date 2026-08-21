@@ -179,7 +179,7 @@ Singleton {
     FileView {
         id: notifFileView
         // QUICKSHELL-GIT: path: Quickshell.cachePath("notifications.json")
-        path: Quickshell.env("HOME") + "/.cache/ambxst+/notifications.json"
+        path: (Quickshell.env("XDG_CACHE_HOME") || (Quickshell.env("HOME") + "/.cache")) + "/ambxst+/notifications.json"
         onLoaded: loadNotifications()
     }
 
@@ -427,9 +427,20 @@ Singleton {
         const index = root.list.findIndex(notif => notif.id === id);
         const notifServerIndex = notifServer.trackedNotifications.values.findIndex(notif => notif.id + root.idOffset === id);
         if (index !== -1) {
+            const removed = root.list[index];
             root.list.splice(index, 1);
             triggerListChange();
             scheduleNotificationSave();
+            if (removed) {
+                if (removed.timer) {
+                    removed.timer.stop();
+                    removed.timer.destroy();
+                    removed.timer = null;
+                }
+                // Defer destroy to avoid re-entrancy during splice
+                const toDestroy = removed;
+                Qt.callLater(() => toDestroy.destroy());
+            }
         }
         if (notifServerIndex !== -1) {
             notifServer.trackedNotifications.values[notifServerIndex].dismiss();
@@ -446,6 +457,7 @@ Singleton {
             idsMap[id] = true;
         });
 
+        const removed = root.list.filter(notif => idsMap[notif.id]);
         const newList = root.list.filter(notif => !idsMap[notif.id]);
         const removedCount = root.list.length - newList.length;
 
@@ -453,6 +465,16 @@ Singleton {
             root.list = newList;
             triggerListChange();
             scheduleNotificationSave();
+            for (let i = 0; i < removed.length; ++i) {
+                const n = removed[i];
+                if (n.timer) {
+                    n.timer.stop();
+                    n.timer.destroy();
+                    n.timer = null;
+                }
+                const toDestroy = n;
+                Qt.callLater(() => toDestroy.destroy());
+            }
         }
 
         ids.forEach(id => {
@@ -465,9 +487,20 @@ Singleton {
     }
 
     function discardAllNotifications() {
+        const oldList = root.list.slice(0);
         root.list = [];
         triggerListChange();
         scheduleNotificationSave();
+        for (let i = 0; i < oldList.length; ++i) {
+            const n = oldList[i];
+            if (n.timer) {
+                n.timer.stop();
+                n.timer.destroy();
+                n.timer = null;
+            }
+            const toDestroy = n;
+            Qt.callLater(() => toDestroy.destroy());
+        }
         notifServer.trackedNotifications.values.forEach(notif => {
             notif.dismiss();
         });

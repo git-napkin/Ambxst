@@ -57,20 +57,49 @@ Singleton {
     // Unified monitor process.
     // Resource-efficient: only runs when dashboard is open.
     // Optimized GPU polling avoids waking dGPUs.
+    property int _restartAttempts: 0
+    property Timer _monitorRestartTimer: Timer {
+        interval: Math.min(5000, 500 * Math.pow(2, root._restartAttempts))
+        repeat: false
+        onTriggered: {
+            if (GlobalStates.dashboardOpen && GlobalStates.dashboardCurrentTab === 2 && root.validDisks.length > 0) {
+                root._restartAttempts++;
+                monitorProcess.running = true;
+            }
+        }
+    }
+
     property Process monitorProcess: Process {
         id: monitorProcess
         running: GlobalStates.dashboardOpen && GlobalStates.dashboardCurrentTab === 2 && root.validDisks.length > 0
-        
+
         command: {
             let cmd = ["python3", Quickshell.shellDir + "/scripts/system_monitor.py", root.updateInterval.toString()];
             return cmd.concat(root.validDisks);
         }
-        
+
+        onExited: (exitCode, exitStatus) => {
+            if (exitCode !== 0 && exitStatus !== 0) {
+                console.warn("SystemResources: monitor crashed (code " + exitCode + "), restarting");
+            }
+            // Binding breaks after crash — explicitly restart if dashboard still wants it
+            if (GlobalStates.dashboardOpen && GlobalStates.dashboardCurrentTab === 2 && root.validDisks.length > 0) {
+                if (exitCode === 0) root._restartAttempts = 0;
+                root._monitorRestartTimer.restart();
+            } else {
+                root._restartAttempts = 0;
+            }
+        }
+
+        onRunningChanged: {
+            if (running) root._restartAttempts = 0;
+        }
+
         stdout: SplitParser {
             onRead: data => {
                 try {
                     const stats = JSON.parse(data);
-                    
+
                     // Static info (received once at start)
                     if (stats.static) {
                         root.cpuModel = stats.static.cpu_model || root.cpuModel;
@@ -87,21 +116,21 @@ Singleton {
                         root.cpuUsage = stats.cpu.usage;
                         root.cpuTemp = stats.cpu.temp;
                     }
-                    
+
                     if (stats.ram) {
                         root.ramUsage = stats.ram.usage;
                         root.ramTotal = stats.ram.total;
                         root.ramUsed = stats.ram.used;
                         root.ramAvailable = stats.ram.available;
                     }
-                    
+
                     if (stats.disk) root.diskUsage = stats.disk.usage;
-                    
+
                     if (stats.gpu) {
                         root.gpuUsages = stats.gpu.usages;
                         root.gpuTemps = stats.gpu.temps;
                     }
-                    
+
                     root.updateHistory();
                 } catch (e) {
                     console.warn("SystemResources: Failed to parse monitor data: " + e);

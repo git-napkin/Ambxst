@@ -7,7 +7,7 @@ import qs.config
 FileView {
     id: colors
     // QUICKSHELL-GIT: path: Quickshell.cachePath("colors.json")
-    path: Quickshell.env("HOME") + "/.cache/ambxst+/colors.json"
+    path: (Quickshell.env("XDG_CACHE_HOME") || (Quickshell.env("HOME") + "/.cache")) + "/ambxst+/colors.json"
     preload: true
     watchChanges: true
     onFileChanged: {
@@ -37,6 +37,13 @@ FileView {
     property Connections oledWatcher: Connections {
         target: Config
         function onOledModeChanged() {
+            generationTimer.restart();
+        }
+    }
+
+    property Connections lightModeWatcher: Connections {
+        target: Config
+        function onLightModeChanged() {
             generationTimer.restart();
         }
     }
@@ -77,7 +84,7 @@ FileView {
         interval: 100
         repeat: false
         onTriggered: {
-            const input = (colors.text() || "") + "|oled:" + Config.oledMode + "|bg:" + (Config.theme.srBg ? Config.theme.srBg.opacity : 0);
+            const input = (colors.text() || "") + "|oled:" + Config.oledMode + "|light:" + Config.lightMode + "|bg:" + (Config.theme.srBg ? Config.theme.srBg.opacity : 0);
             if (input !== "" && input === root._lastGenerationInput)
                 return;
             root._lastGenerationInput = input;

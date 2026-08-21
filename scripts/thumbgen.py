@@ -89,12 +89,21 @@ class ThumbnailGenerator:
         try:
             # Recursively find all files in wallpaper directory and subdirectories
             for file_path in self.wall_path.rglob("*"):
+                # Skip symlinks to avoid traversal outside wall_path
+                if file_path.is_symlink():
+                    continue
                 if file_path.is_file() and not file_path.name.startswith("."):
                     # Check if any parent directory is hidden
                     if not any(
                         part.startswith(".")
                         for part in file_path.relative_to(self.wall_path).parts[:-1]
                     ):
+                        # Ensure resolved path stays within wall_path (symlink escape)
+                        try:
+                            if not file_path.resolve().is_relative_to(self.wall_path.resolve()):
+                                continue
+                        except Exception:
+                            pass
                         ext = file_path.suffix.lower()
                         if (
                             ext in VIDEO_EXTENSIONS
@@ -155,13 +164,20 @@ class ThumbnailGenerator:
         try:
             # Ensure parent directory exists
             thumbnail_path.parent.mkdir(parents=True, exist_ok=True)
+            # Guard leading dash filenames
+            vp = str(video_path)
+            out = str(thumbnail_path)
+            if os.path.basename(vp).startswith("-"):
+                vp = os.path.join(os.path.dirname(vp) or ".", "./" + os.path.basename(vp))
+            if os.path.basename(out).startswith("-"):
+                out = os.path.join(os.path.dirname(out) or ".", "./" + os.path.basename(out))
 
             # FFmpeg command for high-quality thumbnail
             cmd = [
                 "ffmpeg",
                 "-y",
                 "-i",
-                str(video_path),
+                vp,
                 "-ss",
                 "00:00:01",  # Skip first second to avoid black frames
                 "-vframes",
@@ -172,7 +188,7 @@ class ThumbnailGenerator:
                 "2",  # High quality
                 "-f",
                 "image2",  # Force image format
-                str(thumbnail_path),
+                out,
             ]
 
             # Run FFmpeg with error suppression
@@ -201,11 +217,19 @@ class ThumbnailGenerator:
         try:
             # Ensure parent directory exists
             thumbnail_path.parent.mkdir(parents=True, exist_ok=True)
+            ip = str(image_path)
+            out = str(thumbnail_path)
+            if os.path.basename(ip).startswith("-"):
+                ip = os.path.join(os.path.dirname(ip) or ".", "./" + os.path.basename(ip))
+            if os.path.basename(out).startswith("-"):
+                out = os.path.join(os.path.dirname(out) or ".", "./" + os.path.basename(out))
+            import shutil
+            conv = "magick" if shutil.which("magick") else "convert"
+            base = [conv] if conv == "magick" else ["convert"]
 
             # ImageMagick command for high-quality thumbnail
-            cmd = [
-                "convert",
-                str(image_path),
+            cmd = base + [
+                ip,
                 "-resize",
                 "140x140^",  # Force resize to exact dimensions
                 "-gravity",
@@ -214,7 +238,7 @@ class ThumbnailGenerator:
                 "140x140",  # Crop to exact size
                 "-quality",
                 "85",  # High quality JPEG
-                str(thumbnail_path),
+                out,
             ]
 
             # Run ImageMagick
@@ -243,13 +267,19 @@ class ThumbnailGenerator:
         try:
             # Ensure parent directory exists
             thumbnail_path.parent.mkdir(parents=True, exist_ok=True)
+            gp = str(gif_path)
+            out = str(thumbnail_path)
+            if os.path.basename(gp).startswith("-"):
+                gp = os.path.join(os.path.dirname(gp) or ".", "./" + os.path.basename(gp))
+            if os.path.basename(out).startswith("-"):
+                out = os.path.join(os.path.dirname(out) or ".", "./" + os.path.basename(out))
 
             # FFmpeg command to extract first frame from GIF
             cmd = [
                 "ffmpeg",
                 "-y",
                 "-i",
-                str(gif_path),
+                gp,
                 "-vframes",
                 "1",  # Extract only the first frame
                 "-vf",
@@ -258,7 +288,7 @@ class ThumbnailGenerator:
                 "2",  # High quality
                 "-f",
                 "image2",  # Force image format
-                str(thumbnail_path),
+                out,
             ]
 
             # Run FFmpeg

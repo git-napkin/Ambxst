@@ -30,7 +30,11 @@ class SystemMonitor:
         base = "/sys/class/hwmon"
         if not os.path.exists(base):
             return None
-        for hwmon in os.listdir(base):
+        try:
+            hwmons = sorted(os.listdir(base))
+        except OSError:
+            return None
+        for hwmon in hwmons:
             path = os.path.join(base, hwmon)
             try:
                 with open(os.path.join(path, "name"), "r") as f:
@@ -43,16 +47,21 @@ class SystemMonitor:
                     "x86_pkg_temp",
                     "amd_energy",
                 ]:
-                    for item in os.listdir(path):
-                        if item.endswith("_input") and item.startswith("temp"):
-                            candidate = os.path.join(path, item)
-                            try:
-                                with open(candidate, "r") as f:
-                                    val = int(f.read().strip())
-                                if 10000 < val < 120000:
-                                    return candidate
-                            except Exception:
-                                continue
+                    try:
+                        items = sorted(os.listdir(path))
+                    except OSError:
+                        continue
+                    # Prefer temp1_input explicitly
+                    candidates = [i for i in items if i == "temp1_input"] + [i for i in items if i.startswith("temp") and i.endswith("_input") and i != "temp1_input"]
+                    for item in candidates:
+                        candidate = os.path.join(path, item)
+                        try:
+                            with open(candidate, "r") as f:
+                                val = int(f.read().strip())
+                            if 10000 < val < 120000:
+                                return candidate
+                        except Exception:
+                            continue
             except Exception:
                 continue
         return None
@@ -66,10 +75,20 @@ class SystemMonitor:
             try:
                 hwmon_base = f"/sys/class/drm/{card}/device/hwmon"
                 if os.path.exists(hwmon_base):
-                    hwmon_dir = os.listdir(hwmon_base)[0]
-                    paths[card] = os.path.join(
-                        hwmon_base, hwmon_dir, "temp1_input"
-                    )
+                    try:
+                        hwmons = sorted(os.listdir(hwmon_base))
+                    except OSError:
+                        continue
+                    if not hwmons:
+                        continue
+                    for hwmon_dir in hwmons:
+                        candidate = os.path.join(hwmon_base, hwmon_dir, "temp1_input")
+                        if os.path.exists(candidate):
+                            paths[card] = candidate
+                            break
+                    else:
+                        # Fallback to first
+                        paths[card] = os.path.join(hwmon_base, hwmons[0], "temp1_input")
             except Exception:
                 pass
         return paths
@@ -134,18 +153,23 @@ class SystemMonitor:
                         vendor_id = f.read().strip().lower()
 
                     if vendor_id == "0x1002":
+                        # Extract card number safely (card10 -> 10 not 0)
+                        m = re.search(r"card(\d+)", card)
+                        num = m.group(1) if m else card[-1]
                         gpus.append(
                             {
                                 "vendor": "amd",
-                                "name": f"AMD GPU {card[-1]}",
+                                "name": f"AMD GPU {num}",
                                 "card": card,
                             }
                         )
                     elif vendor_id == "0x8086":
+                        m = re.search(r"card(\d+)", card)
+                        num = m.group(1) if m else card[-1]
                         gpus.append(
                             {
                                 "vendor": "intel",
-                                "name": f"Intel GPU {card[-1]}",
+                                "name": f"Intel GPU {num}",
                                 "card": card,
                             }
                         )
@@ -155,25 +179,28 @@ class SystemMonitor:
 
     def _detect_disk_types(self, disks):
         types = {}
+        # Read mounts once
+        mounts_map = {}
+        try:
+            with open("/proc/mounts", "r") as f:
+                for line in f:
+                    parts = line.split()
+                    if len(parts) >= 2:
+                        mounts_map[parts[1]] = parts[0]
+        except OSError:
+            pass
         for mount in disks:
             types[mount] = "unknown"
             try:
-                with open("/proc/mounts", "r") as f:
-                    for line in f:
-                        parts = line.split()
-                        if parts[1] == mount:
-                            dev = parts[0]
-                            if dev.startswith("/dev/"):
-                                base = re.sub(
-                                    r"p?[0-9]*$", "", dev.replace("/dev/", "")
-                                )
-                                rota_path = f"/sys/block/{base}/queue/rotational"
-                                if os.path.exists(rota_path):
-                                    with open(rota_path, "r") as f2:
-                                        types[mount] = (
-                                            "hdd" if f2.read().strip() == "1" else "ssd"
-                                        )
-                            break
+                dev = mounts_map.get(mount)
+                if not dev or not dev.startswith("/dev/"):
+                    continue
+                base = re.sub(r"p?[0-9]*$", "", dev.replace("/dev/", ""))
+                # Handle dm-*, zram etc fallback
+                rota_path = f"/sys/block/{base}/queue/rotational"
+                if os.path.exists(rota_path):
+                    with open(rota_path, "r") as f2:
+                        types[mount] = "hdd" if f2.read().strip() == "1" else "ssd"
             except Exception:
                 pass
         return types
@@ -266,25 +293,25 @@ class SystemMonitor:
                 if is_active:
                     if refresh_nvidia:
                         try:
-                            out = (
-                                subprocess.check_output(
-                                    [
-                                        "nvidia-smi",
-                                        "-i",
-                                        gpu["pci_id"],
-                                        "--query-gpu=utilization.gpu,temperature.gpu",
-                                        "--format=csv,noheader,nounits",
-                                    ]
-                                )
-                                .decode("utf-8")
-                                .strip()
-                            )
+                            out = subprocess.check_output(
+                                [
+                                    "nvidia-smi",
+                                    "-i",
+                                    gpu["pci_id"],
+                                    "--query-gpu=utilization.gpu,temperature.gpu",
+                                    "--format=csv,noheader,nounits",
+                                ],
+                                timeout=5,
+                            ).decode("utf-8").strip()
                             parts = out.split(",")
                             if len(parts) >= 2:
                                 self._nvidia_cache[gpu["pci_id"]] = (
-                                    float(parts[0]),
-                                    int(parts[1]),
+                                    float(parts[0].strip()),
+                                    int(parts[1].strip()),
                                 )
+                        except (subprocess.TimeoutExpired, FileNotFoundError, subprocess.CalledProcessError, ValueError):
+                            # Keep previous cache; don't overwrite with stale on failure
+                            pass
                         except Exception:
                             pass
                 else:
@@ -346,6 +373,14 @@ if __name__ == "__main__":
         flush=True,
     )
 
+    import signal
+
+    def _handle_term(signum, frame):
+        sys.exit(0)
+
+    signal.signal(signal.SIGTERM, _handle_term)
+    signal.signal(signal.SIGINT, _handle_term)
+
     try:
         while True:
             cpu_usage = monitor.get_cpu()
@@ -376,5 +411,5 @@ if __name__ == "__main__":
                 flush=True,
             )
             time.sleep(interval_sec)
-    except KeyboardInterrupt:
+    except (KeyboardInterrupt, SystemExit):
         sys.exit(0)

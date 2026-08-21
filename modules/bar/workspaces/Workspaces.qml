@@ -78,7 +78,14 @@ Item {
         if (a === b) return true;
         if (!a || !b || a.length !== b.length) return false;
         for (let i = 0; i < a.length; i++) {
-            if (a[i] !== b[i]) return false;
+            const av = a[i];
+            const bv = b[i];
+            // Deep compare for occupiedRanges objects {start,end}
+            if (av && typeof av === 'object' && bv && typeof bv === 'object') {
+                if (av.start !== bv.start || av.end !== bv.end) return false;
+            } else if (av !== bv) {
+                return false;
+            }
         }
         return true;
     }

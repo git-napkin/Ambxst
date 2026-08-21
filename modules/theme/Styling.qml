@@ -55,10 +55,30 @@ QtObject {
 
     // Canonical easings — centralized so motion "weight" is uniform.
     // Out for entrances, In for exits, InOut for state transitions.
-    readonly property int animEasing: Easing.OutCubic
-    readonly property int animEasingOut: Easing.OutCubic
-    readonly property int animEasingIn: Easing.InCubic
-    readonly property int animEasingInOut: Easing.InOutCubic
+    // Now driven by Config.theme.animEasing* strings (validated via
+    // ConfigValidator enum); fallback to Cubic variants on unknown.
+    function _easingFor(name, fallback) {
+        switch (name) {
+        case "OutCubic": return Easing.OutCubic;
+        case "OutQuart": return Easing.OutQuart;
+        case "OutQuad": return Easing.OutQuad;
+        case "OutExpo": return Easing.OutExpo;
+        case "InCubic": return Easing.InCubic;
+        case "InQuart": return Easing.InQuart;
+        case "InQuad": return Easing.InQuad;
+        case "InExpo": return Easing.InExpo;
+        case "InOutCubic": return Easing.InOutCubic;
+        case "InOutQuart": return Easing.InOutQuart;
+        case "InOutQuad": return Easing.InOutQuad;
+        case "InOutExpo": return Easing.InOutExpo;
+        case "Linear": return Easing.Linear;
+        default: return fallback;
+        }
+    }
+    readonly property int animEasing: _easingFor(Config.theme.animEasingOut, Easing.OutCubic)
+    readonly property int animEasingOut: _easingFor(Config.theme.animEasingOut, Easing.OutCubic)
+    readonly property int animEasingIn: _easingFor(Config.theme.animEasingIn, Easing.InCubic)
+    readonly property int animEasingInOut: _easingFor(Config.theme.animEasingInOut, Easing.InOutCubic)
 
     function getStyledRectConfig(variant) {
         switch (variant) {
