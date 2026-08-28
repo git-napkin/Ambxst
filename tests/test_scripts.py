@@ -125,5 +125,33 @@ class TestColorpicker(unittest.TestCase):
         self.assertTrue(callable(self.colorpicker.main))
 
 
+class TestDesktopScan(unittest.TestCase):
+    def test_scan_lists_folders_files_and_desktop_entries(self):
+        import importlib.util
+        spec = importlib.util.spec_from_file_location(
+            "desktop_scan", SCRIPTS_DIR / "desktop_scan.py"
+        )
+        scan_mod = importlib.util.module_from_spec(spec)
+        spec.loader.exec_module(scan_mod)
+
+        with tempfile.TemporaryDirectory() as tmp:
+            os.mkdir(os.path.join(tmp, "Docs"))
+            with open(os.path.join(tmp, "notes.txt"), "w") as f:
+                f.write("hi")
+            with open(os.path.join(tmp, "App.desktop"), "w") as f:
+                f.write("[Desktop Entry]\nName=Cool App\nIcon=cool-app\n")
+            with open(os.path.join(tmp, ".hidden"), "w") as f:
+                f.write("nope")
+
+            items = {item["name"]: item for item in scan_mod.scan(tmp)}
+            self.assertIn("Docs", items)
+            self.assertEqual(items["Docs"]["type"], "folder")
+            self.assertIn("notes.txt", items)
+            self.assertIsNone(items["notes.txt"]["type"])
+            self.assertEqual(items["Cool App"]["icon"], "cool-app")
+            self.assertTrue(items["Cool App"]["isDesktopFile"])
+            self.assertNotIn(".hidden", items)
+
+
 if __name__ == "__main__":
     unittest.main(verbosity=2)

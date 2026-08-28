@@ -6,84 +6,50 @@ import Quickshell.Io
 Singleton {
     id: root
 
-    // usage.json path
-    // QUICKSHELL-GIT: property string usageFilePath: Quickshell.cachePath("usage.json")
-    property string usageFilePath: Quickshell.env("HOME") + "/.cache/ambxst+/usage.json"
-
-    // Cache: { appId: { count, lastUsed } }
+    property string usageFilePath: (Quickshell.env("XDG_CACHE_HOME") || (Quickshell.env("HOME") + "/.cache")) + "/ambxst+/usage.json"
     property var usageData: ({})
     property bool dataLoaded: false
-    property bool fileReady: false
 
-    // Signal when data is ready
     signal usageDataReady
 
-    // Time-based scoring decay (favor recent apps)
     readonly property int maxBoostScore: 200
     readonly property int dayInMs: 86400000
 
-    // Ensure the file exists
-    Process {
-        id: ensureUsageFile
-        running: true
-        command: ["bash", "-c", "mkdir -p \"$(dirname '" + root.usageFilePath + "')\" && if [ ! -f '" + root.usageFilePath + "' ]; then echo '{}' > '" + root.usageFilePath + "'; fi"]
-        onExited: {
-            root.fileReady = true;
-            Qt.callLater(() => usageFile.reload());
-        }
-    }
-
     FileView {
         id: usageFile
-        path: root.fileReady ? root.usageFilePath : ""
+        path: root.usageFilePath
+        printErrors: false
         onLoaded: root.loadUsageData()
-    }
-
-    Component.onCompleted: {
-        Qt.callLater(() => usageFile.reload());
-    }
-
-    // Load usage data from file
-    function loadUsageData() {
-        try {
-            const data = usageFile.text();
-            if (!data || data.trim() === "") {
-                console.log("UsageTracker: No existing usage data, starting fresh");
-                root.usageData = {};
-                root.dataLoaded = true;
-                root.usageDataReady();
-                return;
-            }
-
-            root.usageData = JSON.parse(data);
-            console.log("UsageTracker: Loaded", Object.keys(root.usageData).length, "entries from usage.json");
-            root.dataLoaded = true;
-            root.usageDataReady();
-        } catch (e) {
-            console.warn("UsageTracker: Failed to parse usage.json:", e);
+        onLoadFailed: {
             root.usageData = {};
             root.dataLoaded = true;
             root.usageDataReady();
         }
     }
 
-    // Save usage data to file
-    function saveUsageData() {
-        if (!root.fileReady) {
-            console.warn("UsageTracker: File not ready, skipping save");
-            return;
+    function loadUsageData() {
+        try {
+            const data = usageFile.text();
+            if (!data || data.trim() === "") {
+                root.usageData = {};
+            } else {
+                root.usageData = JSON.parse(data);
+            }
+        } catch (e) {
+            console.warn("UsageTracker: Failed to parse usage.json:", e);
+            root.usageData = {};
         }
-
-        const jsonData = JSON.stringify(usageData, null, 2);
-        usageFile.setText(jsonData);
+        root.dataLoaded = true;
+        root.usageDataReady();
     }
 
-    // Record that an app was used
+    function saveUsageData() {
+        usageFile.setText(JSON.stringify(usageData, null, 2));
+    }
+
     function recordUsage(appId) {
-        if (!appId) {
-            console.warn("UsageTracker: recordUsage called with empty appId");
+        if (!appId)
             return;
-        }
 
         var now = Date.now();
 
@@ -97,34 +63,21 @@ Singleton {
             };
         }
 
-        // Force property change notification
         usageData = usageData;
-
         saveUsageData();
     }
 
-    // Get usage score for an app (used for sorting)
-    // Higher score = more recently/frequently used
     function getUsageScore(appId) {
-        if (!appId || !usageData[appId]) {
+        if (!appId || !usageData[appId])
             return 0;
-        }
 
         var data = usageData[appId];
-        var now = Date.now();
-        var daysSinceLastUse = (now - data.lastUsed) / dayInMs;
-
-        // Exponential time decay: baseScore + (maxBoost * e^(-daysSinceLastUse/7))
-        // Boosts apps used within the last week.
+        var daysSinceLastUse = (Date.now() - data.lastUsed) / dayInMs;
         var timeBoost = maxBoostScore * Math.exp(-daysSinceLastUse / 7);
-
-        // Frequency score: logarithmic to prevent over-weighting
         var frequencyScore = Math.log(data.count + 1) * 20;
-
         return timeBoost + frequencyScore;
     }
 
-    // Get all apps sorted by usage (most used/recent first)
     function getTopApps(limit) {
         if (!limit)
             limit = 10;
@@ -146,7 +99,6 @@ Singleton {
         return apps.slice(0, limit);
     }
 
-    // Clear old entries (apps not used in 90 days)
     function pruneOldEntries() {
         var now = Date.now();
         var ninetyDaysInMs = dayInMs * 90;

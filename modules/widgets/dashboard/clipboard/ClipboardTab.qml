@@ -28,7 +28,6 @@ Item {
         } else if (root.aliasMode) {
             root.cancelAliasMode();
         } else {
-            // Cerrar el dashboard
             Visibilities.setActiveModule("");
         }
     }
@@ -83,15 +82,9 @@ Item {
         return ListUtils.expandedRowHeight(opts);
     }
 
-    onExpandedItemIndexChanged:
-    // Close expanded options when selection changes to a different item is handled in onSelectedIndexChanged
-    {}
-
-    // Refresh clipboard list when tab becomes visible
     onVisibleChanged: {
-        if (visible) {
+        if (visible)
             ClipboardService.list();
-        }
     }
 
     function adjustScrollForExpandedItem(index) {
@@ -100,7 +93,6 @@ Item {
 
         var itemY = index * ListUtils.ROW_HEIGHT;
 
-        // Clipboard rows gain an extra "Open" option for files/images/URLs.
         var entry = itemsModel.get(index);
         var itemData = entry ? entry.itemData : null;
         var optionsCount = 4;
@@ -178,14 +170,12 @@ Item {
         return ClipboardService.linkPreviewCache[urlToLookup] || null;
     }
 
-    // Helper function to get file path from URI
     function getFilePathFromUri(content) {
         if (!content || !content.startsWith("file://"))
             return "";
         return decodeURIComponent(content.substring(7).trim());
     }
 
-    // Helper function to check if file is an image
     function isImageFile(filePath) {
         if (!filePath)
             return false;
@@ -193,20 +183,17 @@ Item {
         return ['jpg', 'jpeg', 'png', 'gif', 'bmp', 'webp', 'svg', 'ico'].indexOf(ext) !== -1;
     }
 
-    // Helper function to get icon for item
     function getIconForItem(item) {
         if (!item)
             return Icons.clip;
 
-        // Check if it's a URL (for favicon)
         if (!item.isImage && !item.isFile) {
             var content = item.preview || "";
             if (ClipboardUtils.isUrl(content)) {
-                return "link"; // Special marker for URL
+                return "link";
             }
         }
 
-        // Default icons
         if (item.isImage)
             return Icons.image;
         if (item.isFile)
@@ -214,8 +201,6 @@ Item {
         return Icons.clip;
     }
 
-    // Helper function to get favicon URL for item
-    // First checks the linkPreviewCache for the best favicon, then uses Google service (PNG) to avoid ICO decode errors
     function getFaviconUrl(item) {
         if (!item || item.isImage || item.isFile)
             return "";
@@ -230,26 +215,14 @@ Item {
             return cachedData.favicon;
         }
 
-        // Prefer Google service (PNG) over direct .ico to avoid Qt decode warnings
         return ClipboardUtils.getFaviconFallbackUrl(content);
     }
 
-    // Helper function to get fallback favicon URL (Direct .ico as backup)
     function getFaviconFallbackUrl(item) {
         if (!item || item.isImage || item.isFile)
             return "";
         var content = item.preview || "";
         return ClipboardUtils.getFaviconUrl(content);
-    }
-
-    // Helper function to get usable favicon from link preview data
-    function getUsableFavicon(faviconUrl) {
-        return faviconUrl || "";
-    }
-
-    // Helper function to get fallback favicon for link preview
-    function getUsableFaviconFallback(originalUrl) {
-        return ClipboardUtils.getFaviconFallbackUrl(originalUrl);
     }
 
     implicitWidth: 400
@@ -2419,7 +2392,7 @@ Item {
                                                 anchors.fill: parent
                                                 sourceSize.width: 40
                                                 sourceSize.height: 40
-                                                source: root.linkPreviewData && root.linkPreviewData.favicon ? root.getUsableFavicon(root.linkPreviewData.favicon) : ""
+                                                source: root.linkPreviewData && root.linkPreviewData.favicon ? (root.linkPreviewData.favicon || "") : ""
                                                 fillMode: Image.PreserveAspectFit
                                                 asynchronous: true
                                                 cache: true
@@ -2438,7 +2411,7 @@ Item {
                                                 anchors.fill: parent
                                                 sourceSize.width: 40
                                                 sourceSize.height: 40
-                                                source: parent.triedFallback && root.safeCurrentContent ? root.getUsableFaviconFallback(root.safeCurrentContent) : ""
+                                                source: parent.triedFallback && root.safeCurrentContent ? ClipboardUtils.getFaviconFallbackUrl(root.safeCurrentContent) : ""
                                                 fillMode: Image.PreserveAspectFit
                                                 asynchronous: true
                                                 cache: true
@@ -2593,7 +2566,7 @@ Item {
                                                     anchors.fill: parent
                                                     sourceSize.width: 40
                                                     sourceSize.height: 40
-                                                    source: root.linkPreviewData && root.linkPreviewData.favicon ? root.getUsableFavicon(root.linkPreviewData.favicon) : ""
+                                                    source: root.linkPreviewData && root.linkPreviewData.favicon ? (root.linkPreviewData.favicon || "") : ""
                                                     fillMode: Image.PreserveAspectFit
                                                     asynchronous: true
                                                     cache: true
@@ -2612,7 +2585,7 @@ Item {
                                                     anchors.fill: parent
                                                     sourceSize.width: 40
                                                     sourceSize.height: 40
-                                                    source: parent.triedFallback && root.safeCurrentContent ? root.getUsableFaviconFallback(root.safeCurrentContent) : ""
+                                                    source: parent.triedFallback && root.safeCurrentContent ? ClipboardUtils.getFaviconFallbackUrl(root.safeCurrentContent) : ""
                                                     fillMode: Image.PreserveAspectFit
                                                     asynchronous: true
                                                     cache: true
@@ -3303,7 +3276,6 @@ Item {
         }
     }
 
-    // Handler de teclas global para manejar navegación en modo eliminar y alias
     Keys.onPressed: event => {
         if (root.deleteMode) {
             if (event.key === Qt.Key_Left) {

@@ -1,7 +1,6 @@
 pragma Singleton
 
 import QtQuick
-import QtQml
 import Quickshell
 import Quickshell.Io
 
@@ -45,18 +44,8 @@ Singleton {
             return
         }
 
-        console.log("Loading preset:", presetName)
         currentPreset = presetName
 
-        // Find the preset object to get its config files
-        // Prioritize user presets if names collide? Or just find the first match?
-        // Since names can be duplicated now, we need to know WHICH one to load.
-        // But the loadPreset signature only takes a name. 
-        // For now, let's assume the UI passes the unique ID or we handle the ambiguity.
-        // Given the constraints, let's try to find a match.
-        // If we have duplicate names, 'activePreset' just stores the string name.
-        // This is a limitation of the current active_preset storage (just a string).
-        // Use the first match found.
         const preset = presets.find(p => p.name === presetName)
         if (!preset) {
             console.warn("Preset not found in list:", presetName)
@@ -76,8 +65,7 @@ Singleton {
              const dstPath = configDir + "/config/" + jsonFile
              copyCmd += `cp "${srcPath}" "${dstPath}" && `
         }
-        
-        // Update active preset file
+
         copyCmd += `echo "${presetName}" > "${activePresetFile}"`
 
         if (copyCmd.length > 0) {
@@ -106,9 +94,6 @@ Singleton {
             return
         }
 
-        console.log("Saving preset:", presetName, "with files:", configFiles)
-
-        // Create preset directory and copy config files
         const presetPath = presetsDir + "/" + presetName
         const createCmd = `mkdir -p "${presetPath}"`
 
@@ -117,20 +102,6 @@ Singleton {
             const jsonFile = configFile.replace('.js', '.json')
             if (root.excludedFiles.includes(jsonFile)) continue;
 
-            // The source is configDir (~/.config/ambxst+), NOT configDir/config
-            // But wait, the configDir property is defined as ~/.config/ambxst+ below?
-            // Let's check the property definition.
-            // property string configDir: ... + "/ambxst+"
-            // But Config.qml says configDir is ... + "/ambxst+/config"
-            // We need to match Config.qml's path.
-            
-            // In Config.qml: property string configDir: ... + "/ambxst+/config"
-            // Here: readonly property string configDir: ... + "/ambxst+"
-            // This is a mismatch!
-            
-            // We should use the same path as Config.qml for reading/writing config files.
-            // Let's assume the files are in .../ambxst+/config based on Config.qml and ls output.
-            
             const srcPath = configDir + "/config/" + jsonFile 
             const dstPath = presetPath + "/" + jsonFile
             copyCmd += `cp "${srcPath}" "${dstPath}" && `
@@ -138,7 +109,6 @@ Singleton {
         
         // Create info.json with default author
         const infoContent = JSON.stringify({ author: "User", authorUrl: "" }, null, 4)
-        // Use printf to write info.json safely
         copyCmd += `printf '${infoContent}' > "${presetPath}/info.json" && `
 
         copyCmd = copyCmd.slice(0, -4) // Remove last " && "
@@ -252,14 +222,6 @@ Singleton {
                 root.presetsUpdated()
             }
         }
-        
-        onExited: function(exitCode) {
-             if (exitCode !== 0) {
-                // If find fails, it might be empty or error.
-                // We keep existing presets or clear if needed.
-                // Usually find returns 0 even if empty.
-             }
-        }
     }
 
     // Rename a preset
@@ -281,7 +243,6 @@ Singleton {
             return
         }
 
-        console.log("Renaming preset:", oldName, "to:", newName)
         root.pendingRename = { oldName: oldName, newName: newName }
 
         const oldPath = presetsDir + "/" + oldName
@@ -300,13 +261,11 @@ Singleton {
         // Find the preset to check if it's official
         const preset = presets.find(p => p.name === presetName)
         if (preset && preset.isOfficial) {
-            console.log("Updating official preset - creating custom copy")
             const newName = presetName + " (Custom)"
             savePreset(newName, configFiles)
             return
         }
 
-        console.log("Updating preset:", presetName, "with files:", configFiles)
         root.pendingUpdateName = presetName
 
         const presetPath = presetsDir + "/" + presetName
@@ -338,7 +297,6 @@ Singleton {
              return
         }
 
-        console.log("Deleting preset:", presetName)
         root.pendingDeleteName = presetName
 
         const presetPath = presetsDir + "/" + presetName
@@ -358,7 +316,6 @@ Singleton {
 
         onExited: function(exitCode) {
             if (exitCode === 0) {
-                console.log("Preset saved successfully:", root.pendingPresetName)
                 Quickshell.execDetached(["notify-send", "Preset Saved", `Preset "${root.pendingPresetName}" saved successfully.`])
                 // Trigger scan
                 root.scanProcess.running = true
@@ -377,7 +334,6 @@ Singleton {
 
         onExited: function(exitCode) {
             if (exitCode === 0 && root.pendingRename) {
-                console.log("Preset renamed successfully:", root.pendingRename.oldName, "->", root.pendingRename.newName)
                 Quickshell.execDetached(["notify-send", "Preset Renamed", `Preset renamed to "${root.pendingRename.newName}".`])
                 // Update active preset if it was the renamed one
                 if (root.activePreset === root.pendingRename.oldName) {
@@ -402,7 +358,6 @@ Singleton {
 
         onExited: function(exitCode) {
             if (exitCode === 0) {
-                console.log("Preset updated successfully:", root.pendingUpdateName)
                 Quickshell.execDetached(["notify-send", "Preset Updated", `Preset "${root.pendingUpdateName}" updated successfully.`])
                 root.scanProcess.running = true
             } else {
@@ -420,7 +375,6 @@ Singleton {
 
         onExited: function(exitCode) {
             if (exitCode === 0) {
-                console.log("Preset deleted successfully:", root.pendingDeleteName)
                 Quickshell.execDetached(["notify-send", "Preset Deleted", `Preset "${root.pendingDeleteName}" deleted.`])
                 // Clear active preset if it was the deleted one
                 if (root.activePreset === root.pendingDeleteName) {
@@ -448,7 +402,6 @@ Singleton {
 
         onExited: function(exitCode) {
             if (exitCode === 0) {
-                console.log("Preset loaded successfully:", root.currentPreset)
                 Quickshell.execDetached(["notify-send", "Preset Loaded", `Preset "${root.currentPreset}" loaded successfully.`])
                 root.activePreset = root.currentPreset
             } else {
@@ -479,7 +432,6 @@ Singleton {
         printErrors: false
 
         onFileChanged: {
-            console.log("Presets directory changed, rescanning...")
             scanProcess.running = true
         }
     }
@@ -493,8 +445,6 @@ Singleton {
             watchChanges: true
             printErrors: false
             onFileChanged: {
-                console.log("Preset modified (content change):", modelData.name)
-                // Use a debouncer or simple timer to avoid spamming scans if multiple files change
                 root.scanProcess.running = true
             }
         }
@@ -517,7 +467,6 @@ Singleton {
     function initialize() {
         if (_initialized) return;
         _initialized = true;
-        console.log("PresetsService created, presetsDir:", presetsDir)
         initProcess.running = true
     }
 }

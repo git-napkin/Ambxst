@@ -22,11 +22,8 @@ Singleton {
     function checkGridReady() {
         if (maxRowsHint > 0 && maxColumnsHint > 0 && positionsLoaded && !gridReady) {
             gridReady = true;
-            console.log("Grid ready - rows:", maxRowsHint, "cols:", maxColumnsHint);
-            if (tempItems.length > 0 || tempDesktopFiles.length > 0) {
-                console.log("Finalizing items with", tempItems.length + tempDesktopFiles.length, "items");
+            if (tempItems.length > 0)
                 finalizeItems();
-            }
         }
     }
 
@@ -37,13 +34,11 @@ Singleton {
     property var iconPositions: ({})
 
     function savePositions() {
-        var json = JSON.stringify(iconPositions, null, 2);
-        savePositionsProcess.command = ["sh", "-c", "echo '" + json.replace(/'/g, "'\\''") + "' > " + positionsFile];
-        savePositionsProcess.running = true;
+        positionsView.setText(JSON.stringify(iconPositions, null, 2));
     }
 
     function loadPositions() {
-        loadPositionsProcess.running = true;
+        positionsView.reload();
     }
 
     function updateIconPosition(path, gridX, gridY) {
@@ -95,7 +90,11 @@ Singleton {
     }
 
     function getDesktopDir() {
-        getDesktopDirProcess.running = true;
+        root.desktopDir = Quickshell.env("XDG_DESKTOP_DIR") || (Quickshell.env("HOME") + "/Desktop");
+        loadPositions();
+        scanDesktop();
+        directoryWatcher.path = root.desktopDir;
+        directoryWatcher.reload();
     }
 
     function generateThumbnails() {
@@ -106,17 +105,12 @@ Singleton {
 
     function scanDesktop() {
         if (desktopDir) {
-            if (parsingInProgress) {
+            if (scanProcess.running) {
                 needsRescan = true;
             } else {
                 scanProcess.running = true;
             }
         }
-    }
-
-    function parseDesktopFile(filePath) {
-        parseDesktopProcess.command = ["cat", filePath];
-        parseDesktopProcess.running = true;
     }
 
     function executeDesktopFile(filePath) {
@@ -130,44 +124,11 @@ Singleton {
     }
 
     function runInActiveWorkspace(command) {
-        var processComponent = Qt.createQmlObject('import Quickshell.Io; Process { }', root);
-        processComponent.command = ["axctl", "system", "execute", command];
-        processComponent.onExited.connect(() => processComponent.destroy());
-        processComponent.running = true;
+        Quickshell.execDetached(["axctl", "system", "execute", command]);
     }
 
     function trashFile(filePath) {
-        var escapedPath = filePath.replace(/'/g, "'\\''");
-        var processComponent = Qt.createQmlObject('
-            import Quickshell
-            import Quickshell.Io
-            Process {
-                running: true
-                command: ["bash", "-c", "gio trash \'' + escapedPath + '\'"]
-
-                stdout: StdioCollector {
-                    onStreamFinished: {
-                        if (text.length > 0) {
-                            console.log("File moved to trash:", text);
-                        }
-                    }
-                }
-
-                stderr: StdioCollector {
-                    onStreamFinished: {
-                        if (text.length > 0) {
-                            console.warn("Error moving file to trash:", text);
-                        }
-                    }
-                }
-
-                onRunningChanged: {
-                    if (!running) {
-                        destroy();
-                    }
-                }
-            }
-        ', root);
+        Quickshell.execDetached(["gio", "trash", filePath]);
     }
 
     function saveAllPositions() {
@@ -284,74 +245,32 @@ Singleton {
         Qt.callLater(() => getDesktopDir());
     }
 
-    Process {
-        id: savePositionsProcess
-        running: false
-        command: []
+    FileView {
+        id: positionsView
+        path: root.positionsFile
+        printErrors: false
 
-        stderr: StdioCollector {
-            onStreamFinished: {
-                if (text.length > 0) {
-                    console.warn("Error saving positions:", text);
-                }
-            }
-        }
-    }
-
-    Process {
-        id: loadPositionsProcess
-        running: false
-        command: ["cat", positionsFile]
-
-        stdout: StdioCollector {
-            onStreamFinished: {
-                if (text.trim().length > 0) {
-                    try {
-                        var parsed = JSON.parse(text);
-
-                        for (var key in root.iconPositions) {
-                            delete root.iconPositions[key];
-                        }
-
-                        for (var k in parsed) {
-                            root.iconPositions[k] = {
-                                x: parsed[k].x,
-                                y: parsed[k].y
-                            };
-                        }
-
-                        console.log("Loaded", Object.keys(root.iconPositions).length, "icon positions");
-                    } catch (e) {
-                        console.warn("Error parsing positions file:", e);
+        onLoaded: {
+            const raw = text().trim();
+            if (raw.length > 0) {
+                try {
+                    const parsed = JSON.parse(raw);
+                    for (const key in root.iconPositions)
+                        delete root.iconPositions[key];
+                    for (const k in parsed) {
+                        root.iconPositions[k] = {
+                            x: parsed[k].x,
+                            y: parsed[k].y
+                        };
                     }
+                } catch (e) {
+                    console.warn("Error parsing positions file:", e);
                 }
-                root.positionsLoaded = true;
             }
+            root.positionsLoaded = true;
         }
 
-        stderr: StdioCollector {
-            onStreamFinished: {
-                root.positionsLoaded = true;
-            }
-        }
-    }
-
-    Process {
-        id: getDesktopDirProcess
-        running: false
-        command: ["sh", "-c", "echo ${XDG_DESKTOP_DIR:-$HOME/Desktop}"]
-
-        stdout: StdioCollector {
-            onStreamFinished: {
-                root.desktopDir = text.trim();
-                console.log("Desktop directory:", root.desktopDir);
-                console.log("Positions file:", root.positionsFile);
-                loadPositions();
-                scanDesktop();
-                directoryWatcher.path = root.desktopDir;
-                directoryWatcher.reload();
-            }
-        }
+        onLoadFailed: root.positionsLoaded = true
     }
 
     FileView {
@@ -361,7 +280,6 @@ Singleton {
         printErrors: false
 
         onFileChanged: {
-            console.log("Desktop directory changed, rescanning...");
             scanDesktop();
             thumbnailTimer.restart();
         }
@@ -370,99 +288,32 @@ Singleton {
     Process {
         id: scanProcess
         running: false
-        command: ["sh", "-c", "ls -1ap " + root.desktopDir + " | grep -v '^\\.$' | grep -v '^\\.\\.$'"]
+        command: ["python3", decodeURIComponent(Qt.resolvedUrl("../../scripts/desktop_scan.py").toString().replace("file://", "")), root.desktopDir]
 
         stdout: StdioCollector {
             onStreamFinished: {
-                var entries = text.trim().split("\n").filter(f => f.length > 0);
-                var newItems = [];
-                var pendingDesktopFiles = [];
+                var scanned = [];
+                try {
+                    scanned = JSON.parse(text.trim() || "[]");
+                } catch (e) {
+                    console.warn("Error scanning desktop:", e);
+                    return;
+                }
 
-                for (var i = 0; i < entries.length; i++) {
-                    var entry = entries[i];
-                    var isDir = entry.endsWith('/');
-                    var name = isDir ? entry.slice(0, -1) : entry;
-                    var fullPath = root.desktopDir + "/" + name;
-
-                    if (name.startsWith('.')) {
-                        continue;
-                    }
-
-                    if (isDir) {
-                        newItems.push({
-                            name: name,
-                            path: fullPath,
-                            type: 'folder',
-                            icon: 'folder',
-                            isDesktopFile: false,
-                            sortOrder: 0
-                        });
-                    } else if (name.endsWith('.desktop')) {
-                        pendingDesktopFiles.push({
-                            name: name,
-                            path: fullPath,
-                            type: 'application',
-                            icon: 'application-x-executable',
-                            isDesktopFile: true,
-                            sortOrder: 1
-                        });
-                    } else {
-                        var fileType = root.getFileType(name);
-                        newItems.push({
-                            name: name,
-                            path: fullPath,
-                            type: fileType,
-                            icon: root.getIconForType(fileType),
-                            isDesktopFile: false,
-                            sortOrder: 2
-                        });
+                for (var i = 0; i < scanned.length; i++) {
+                    if (!scanned[i].type) {
+                        scanned[i].type = root.getFileType(scanned[i].name);
+                        scanned[i].icon = root.getIconForType(scanned[i].type);
                     }
                 }
 
-                if (!parsingInProgress) {
-                    tempDesktopFiles = pendingDesktopFiles;
-                    tempItems = newItems;
-
-                    if (pendingDesktopFiles.length > 0) {
-                        parsingInProgress = true;
-                        currentDesktopFileIndex = 0;
-                        parseNextDesktopFile();
-                    } else {
-                        if (gridReady && positionsLoaded) {
-                            finalizeItems();
-                        }
-                    }
-                } else {
-                    needsRescan = true;
-                }
+                tempItems = scanned;
+                if (gridReady && positionsLoaded)
+                    finalizeItems();
             }
         }
 
-        stderr: StdioCollector {
-            onStreamFinished: {
-                if (text.length > 0) {
-                    console.warn("Error scanning desktop:", text);
-                }
-            }
-        }
-    }
-
-    property var tempDesktopFiles: []
-    property var tempItems: []
-    property int currentDesktopFileIndex: -1
-    property bool parsingInProgress: false
-    property bool needsRescan: false
-
-    function parseNextDesktopFile() {
-        if (currentDesktopFileIndex < tempDesktopFiles.length) {
-            var item = tempDesktopFiles[currentDesktopFileIndex];
-            parseDesktopFileProcess.command = ["cat", item.path];
-            parseDesktopFileProcess.running = true;
-        } else {
-            parsingInProgress = false;
-            if (gridReady && positionsLoaded) {
-                finalizeItems();
-            }
+        onExited: {
             if (needsRescan) {
                 needsRescan = false;
                 scanDesktop();
@@ -470,8 +321,11 @@ Singleton {
         }
     }
 
+    property var tempItems: []
+    property bool needsRescan: false
+
     function finalizeItems() {
-        var allItems = tempItems.concat(tempDesktopFiles);
+        var allItems = tempItems.slice();
 
         allItems.sort((a, b) => {
             if (a.sortOrder !== b.sortOrder) {
@@ -541,96 +395,9 @@ Singleton {
     }
 
     Process {
-        id: parseDesktopFileProcess
-        running: false
-        command: []
-
-        onRunningChanged: {
-            if (!running && currentDesktopFileIndex >= 0 && currentDesktopFileIndex < tempDesktopFiles.length) {
-                currentDesktopFileIndex++;
-                if (currentDesktopFileIndex < tempDesktopFiles.length) {
-                    Qt.callLater(parseNextDesktopFile);
-                } else {
-                    parsingInProgress = false;
-                    currentDesktopFileIndex = -1;
-                    if (gridReady && positionsLoaded) {
-                        finalizeItems();
-                    }
-                    if (needsRescan) {
-                        needsRescan = false;
-                        scanDesktop();
-                    }
-                }
-            }
-        }
-
-        stdout: StdioCollector {
-            onStreamFinished: {
-                if (currentDesktopFileIndex >= tempDesktopFiles.length) {
-                    return;
-                }
-
-                var item = tempDesktopFiles[currentDesktopFileIndex];
-                var lines = text.split("\n");
-                var name = "";
-                var icon = "application-x-executable";
-
-                for (var i = 0; i < lines.length; i++) {
-                    var line = lines[i].trim();
-                    if (line.startsWith("Name=")) {
-                        name = line.substring(5);
-                    } else if (line.startsWith("Icon=")) {
-                        icon = line.substring(5);
-                    }
-                }
-
-                if (name) {
-                    item.name = name;
-                }
-                item.icon = icon;
-            }
-        }
-
-        stderr: StdioCollector {
-            onStreamFinished: {
-                if (text.length > 0) {
-                    console.warn("Error parsing .desktop file:", text);
-                }
-                if (currentDesktopFileIndex >= tempDesktopFiles.length) {
-                    parsingInProgress = false;
-                    if (needsRescan) {
-                        needsRescan = false;
-                        scanDesktop();
-                    }
-                    return;
-                }
-                currentDesktopFileIndex++;
-                parseNextDesktopFile();
-            }
-        }
-    }
-
-    Process {
         id: thumbnailProcess
         running: false
-        // QUICKSHELL-GIT: command: ["python3", decodeURIComponent(Qt.resolvedUrl("../../scripts/desktop_thumbgen.py").toString().replace("file://", "")), desktopDir, Quickshell.cacheDir + "/desktop_thumbnails"]
         command: ["python3", decodeURIComponent(Qt.resolvedUrl("../../scripts/desktop_thumbgen.py").toString().replace("file://", "")), desktopDir, Quickshell.env("HOME") + "/.cache/ambxst+/desktop_thumbnails"]
-
-        stdout: StdioCollector {
-            onStreamFinished: {
-                if (text.length > 0) {
-                    console.log("Thumbnail generation:", text);
-                }
-            }
-        }
-
-        stderr: StdioCollector {
-            onStreamFinished: {
-                if (text.length > 0) {
-                    console.log("Thumbnail generation output:", text);
-                }
-            }
-        }
     }
 
     Timer {

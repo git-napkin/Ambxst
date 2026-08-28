@@ -10,7 +10,7 @@ LOCATION="${1:-}"
 CACHE_TTL="${2:-600}"
 MAX_RETRIES=3
 RETRY_DELAY=2
-CACHE_DIR="${XDG_CACHE_HOME:-$HOME/.cache}/Ambxst[+]/weather"
+CACHE_DIR="${XDG_CACHE_HOME:-$HOME/.cache}/ambxst+/weather"
 
 # Ensure cache directory exists
 mkdir -p "$CACHE_DIR"

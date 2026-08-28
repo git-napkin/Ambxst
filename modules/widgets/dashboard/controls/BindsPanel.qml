@@ -3,7 +3,7 @@ pragma ComponentBehavior: Bound
 import QtQuick
 import QtQuick.Controls
 import QtQuick.Layouts
-import Quickshell.Io
+import Quickshell
 import qs.modules.theme
 import qs.modules.components
 import qs.config
@@ -24,35 +24,23 @@ Item {
     property bool recordingKey: false
     property bool recordingSawModifier: false
 
-    // Process for unbinding keybinds
-    Process {
-        id: unbindProcess
-    }
-
-    // Function to unbind a specific keybind (supports both old and new format)
     function unbindKeybind(bind) {
         if (!bind)
             return;
 
-        // Check if new format with keys[]
+        const unbind = (mods, key) => {
+            Quickshell.execDetached(["axctl", "config", "unbind-key", mods + "," + key]);
+        };
+
         if (bind.keys && bind.keys.length > 0) {
             for (let k = 0; k < bind.keys.length; k++) {
                 const keyObj = bind.keys[k];
                 const mods = keyObj.modifiers && keyObj.modifiers.length > 0 ? keyObj.modifiers.join(" ") : "";
-                const key = keyObj.key || "";
-                const command = `axctl config unbind-key ${mods},${key}`;
-                console.log("BindsPanel: Unbinding keybind:", command);
-                unbindProcess.command = ["sh", "-c", command];
-                unbindProcess.running = true;
+                unbind(mods, keyObj.key || "");
             }
         } else {
-            // Old format fallback
             const mods = bind.modifiers && bind.modifiers.length > 0 ? bind.modifiers.join(" ") : "";
-            const key = bind.key || "";
-            const command = `axctl config unbind-key ${mods},${key}`;
-            console.log("BindsPanel: Unbinding keybind:", command);
-            unbindProcess.command = ["sh", "-c", command];
-            unbindProcess.running = true;
+            unbind(mods, bind.key || "");
         }
     }
 

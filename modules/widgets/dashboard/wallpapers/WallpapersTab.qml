@@ -184,7 +184,6 @@ FocusScope {
     onVisibleChanged: {
         if (visible) {
             if (GlobalStates.wallpaperManager) {
-                console.log("WallpapersTab became visible, updating subfolders");
                 GlobalStates.wallpaperManager.scanSubfolders();
             }
             // Reposicionar al wallpaper actual cuando se hace visible

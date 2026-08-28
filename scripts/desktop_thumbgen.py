@@ -1,19 +1,15 @@
 #!/usr/bin/env python3
 
-import json
 import os
 import subprocess
 import sys
 import threading
-import time
 from concurrent.futures import ThreadPoolExecutor, as_completed
 from pathlib import Path
-from typing import List, Optional, Tuple
+from typing import List, Tuple
 
 VIDEO_EXTENSIONS = {'.mp4', '.webm', '.mov', '.avi', '.mkv', '.gif'}
 IMAGE_EXTENSIONS = {'.jpg', '.jpeg', '.png', '.webp', '.tif', '.tiff', '.bmp'}
-
-THUMBNAIL_SIZE = "64x64"
 
 class DesktopThumbnailGenerator:
     def __init__(self, desktop_path: str, cache_dir: str):
@@ -27,10 +23,9 @@ class DesktopThumbnailGenerator:
     def setup_cache_dir(self) -> bool:
         try:
             self.cache_dir.mkdir(parents=True, exist_ok=True)
-            print(f"✓ Cache dir: {self.cache_dir}")
             return True
-        except Exception as e:
-            print(f"ERROR creating cache dir: {e}")
+        except OSError as e:
+            print(f"ERROR creating cache dir: {e}", file=sys.stderr)
             return False
 
     def find_files(self) -> Tuple[List[Path], List[Path]]:
@@ -38,7 +33,6 @@ class DesktopThumbnailGenerator:
         images = []
 
         if not self.desktop_path.exists():
-            print(f"ERROR: Desktop path not found: {self.desktop_path}")
             return [], []
 
         # Validate not symlink escape and not hidden leakage
@@ -63,12 +57,10 @@ class DesktopThumbnailGenerator:
                         
             videos.sort()
             images.sort()
-            
-            print(f"✓ Found {len(videos)} videos, {len(images)} images")
             return videos, images
-            
-        except Exception as e:
-            print(f"ERROR scanning directory: {e}")
+
+        except OSError as e:
+            print(f"ERROR scanning directory: {e}", file=sys.stderr)
             return [], []
     
     def get_thumbnail_path(self, file_path: Path) -> Path:
@@ -183,10 +175,7 @@ class DesktopThumbnailGenerator:
             
             with self.lock:
                 self.processed_count += 1
-                progress = (self.processed_count / self.total_files) * 100
-                status = "✓" if success else "✗"
-                print(f"[{self.processed_count}/{self.total_files}] {status} {file_path.name} ({progress:.1f}%)")
-            
+
             return success, message
             
         except Exception as e:
@@ -201,12 +190,8 @@ class DesktopThumbnailGenerator:
             all_files.append((file_path, 'image'))
         
         if not all_files:
-            print("✓ All thumbnails are up to date")
             return
-            
-        print(f"⚡ Processing {len(all_files)} files with {max_workers} workers...")
-        start_time = time.time()
-        
+
         failed_files = []
         
         with ThreadPoolExecutor(max_workers=max_workers) as executor:
@@ -224,64 +209,45 @@ class DesktopThumbnailGenerator:
                         
                 except Exception as e:
                     failed_files.append((file_path, str(e)))
-        
-        elapsed = time.time() - start_time
-        success_count = self.total_files - len(failed_files)
-        
-        print(f"\n🏁 Processing complete in {elapsed:.1f}s")
-        print(f"✅ Success: {success_count}/{self.total_files}")
-        
+
         if failed_files:
-            print(f"❌ Failed: {len(failed_files)}")
+            print(f"Failed {len(failed_files)}/{self.total_files} thumbnails", file=sys.stderr)
             for file_path, error in failed_files[:3]:
-                print(f"   • {file_path.name}: {error}")
-            if len(failed_files) > 3:
-                print(f"   ... and {len(failed_files) - 3} more")
+                print(f"  {file_path.name}: {error}", file=sys.stderr)
     
     def run(self) -> int:
-        print("🖼️  Desktop Thumbnail Generator")
-        print("=" * 40)
-        
         if not self.setup_cache_dir():
             return 1
-        
+
         videos, images = self.find_files()
-        if not any([videos, images]):
-            print("ℹ️  No media files found")
+        if not videos and not images:
             return 0
-        
+
         for video in videos:
             if self.needs_thumbnail(video):
                 self.files_to_process['videos'].append(video)
-                
+
         for image in images:
             if self.needs_thumbnail(image):
                 self.files_to_process['images'].append(image)
-        
+
         self.total_files = (
-            len(self.files_to_process['videos']) + 
+            len(self.files_to_process['videos']) +
             len(self.files_to_process['images'])
         )
-        
+
         if self.total_files == 0:
-            print("✓ All thumbnails are up to date")
             return 0
-        
-        print(f"📋 {self.total_files} files need thumbnail generation")
-        print(f"   • Videos: {len(self.files_to_process['videos'])}")
-        print(f"   • Images: {len(self.files_to_process['images'])}")
-        
+
         max_workers = min(4, os.cpu_count() or 1, self.total_files)
-        
+
         try:
             self.process_files(max_workers)
-            print("🎉 Thumbnail generation complete!")
             return 0
         except KeyboardInterrupt:
-            print("\n⚠️  Interrupted by user")
             return 130
         except Exception as e:
-            print(f"❌ Unexpected error: {e}")
+            print(f"ERROR: {e}", file=sys.stderr)
             return 1
 
 def main():

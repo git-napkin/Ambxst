@@ -283,7 +283,14 @@ QtObject {
     // every 5 seconds. A 30s fallback poll keeps state honest if a signal is
     // ever missed (e.g. the fprintd service dies silently).
     property var deviceMonitorProcess: null
-    property var deviceMonitorFallbackTimer: null
+
+    Timer {
+        id: deviceMonitorFallbackTimer
+        interval: 30000
+        repeat: true
+        running: false
+        onTriggered: root.checkAvailability()
+    }
 
     function initDeviceMonitor() {
         if (deviceMonitorProcess)
@@ -302,11 +309,6 @@ QtObject {
             deviceMonitorProcess.destroy();
             deviceMonitorProcess = null;
         });
-
-        deviceMonitorFallbackTimer = Qt.createQmlObject('import QtQuick; Timer { interval: 30000; repeat: true; running: false }', root);
-        deviceMonitorFallbackTimer.onTriggered.connect(function() {
-            root.checkAvailability();
-        });
     }
 
     function startDeviceMonitoring() {
@@ -318,16 +320,14 @@ QtObject {
         deviceMonitoring = true;
         if (deviceMonitorProcess)
             deviceMonitorProcess.running = true;
-        if (deviceMonitorFallbackTimer)
-            deviceMonitorFallbackTimer.running = true;
+        deviceMonitorFallbackTimer.running = true;
     }
 
     function stopDeviceMonitoring() {
         deviceMonitoring = false;
         if (deviceMonitorProcess)
             deviceMonitorProcess.running = false;
-        if (deviceMonitorFallbackTimer)
-            deviceMonitorFallbackTimer.running = false;
+        deviceMonitorFallbackTimer.running = false;
     }
 
     Component.onCompleted: {

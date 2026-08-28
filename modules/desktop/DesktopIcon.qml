@@ -75,13 +75,8 @@ Item {
             root.activated();
 
             if (root.isDesktopFile) {
-                console.log("Executing desktop file:", root.itemPath);
                 DesktopService.executeDesktopFile(root.itemPath);
-            } else if (root.itemType === 'folder') {
-                console.log("Opening folder:", root.itemPath);
-                DesktopService.openFile(root.itemPath);
             } else {
-                console.log("Opening file:", root.itemPath);
                 DesktopService.openFile(root.itemPath);
             }
         }

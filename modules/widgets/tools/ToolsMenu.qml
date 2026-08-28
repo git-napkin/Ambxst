@@ -91,13 +91,10 @@ ActionGrid {
 
     Process {
         id: openFolderProc
-        // Usamos nohup para desvincular el proceso de visualización de carpetas
         command: ["bash", "-c", "nohup xdg-open \"$0\" > /dev/null 2>&1 &"]
     }
 
     onActionTriggered: action => {
-        console.log("Tools action triggered:", action.tooltip);
-
         if (action.tooltip === "Screenshot") {
             Screenshot.initialize();
             GlobalStates.screenshotToolVisible = true;
@@ -110,7 +107,6 @@ ActionGrid {
             ScreenRecorder.toggleRecording();
             root.itemSelected();
         } else if (action.tooltip === "Open Screenshots") {
-            // Usamos xdg-user-dir en el comando bash para respetar las rutas del sistema
             var cmd = "dir=\"$(xdg-user-dir PICTURES)/Screenshots\"; mkdir -p \"$dir\"; nohup xdg-open \"$dir\" > /dev/null 2>&1 &";
             
             openFolderProc.command = ["bash", "-c", cmd];
@@ -118,7 +114,6 @@ ActionGrid {
             
             root.itemSelected();
         } else if (action.tooltip === "Open Recordings") {
-            // Usamos xdg-user-dir para videos, manteniendo la subcarpeta Recordings
             var cmd = "dir=\"$(xdg-user-dir VIDEOS)/Recordings\"; mkdir -p \"$dir\"; nohup xdg-open \"$dir\" > /dev/null 2>&1 &";
             
             openFolderProc.command = ["bash", "-c", cmd];

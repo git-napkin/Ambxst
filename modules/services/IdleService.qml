@@ -153,7 +153,6 @@ Singleton {
             // If time matches and hasn't been triggered yet
             if (root.elapsedIdleTime >= tVal && !root.triggeredListeners.includes(i)) {
                 if (listener.onTimeout) {
-                    console.log("Idle timer " + tVal + "s reached: " + listener.onTimeout);
                     root.executeCommand(listener.onTimeout);
                 }
                 root.triggeredListeners.push(i);
@@ -171,7 +170,6 @@ Singleton {
             let listener = listeners[idx];
 
             if (listener && listener.onResume) {
-                console.log("Idle resuming (undoing " + (listener.timeout || 0) + "s): " + listener.onResume);
                 root.executeCommand(listener.onResume);
             }
         }

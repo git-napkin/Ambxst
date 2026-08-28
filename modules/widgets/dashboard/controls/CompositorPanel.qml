@@ -74,11 +74,8 @@ Item {
     property var colorPickerCallback: null
 
     function openColorPicker(colorNames, currentColor, dialogTitle, callback) {
-        // Ensure colorNames is a valid array for QML
         colorPickerColorNames = colorNames;
-        // Ensure currentColor is a string
         colorPickerCurrentColor = currentColor.toString();
-        // Ensure dialogTitle is a string
         colorPickerDialogTitle = dialogTitle ? dialogTitle.toString() : "";
         colorPickerCallback = callback;
         colorPickerActive = true;

@@ -9,13 +9,6 @@ SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 QS_BIN="${AMBXST_PLUS_QS:-${AMBXST_QS:-qs}}"
 NIXGL_BIN="${AMBXST_PLUS_NIXGL:-}"
 
-if [ -z "${QML2_IMPORT_PATH:-}" ]; then
-	if command -v qs >/dev/null 2>&1; then
-		true
-	fi
-fi
-
-# If QML2_IMPORT_PATH is set (by wrapper or dev shell), ensure QML_IMPORT_PATH matches
 if [ -n "${QML2_IMPORT_PATH:-}" ] && [ -z "${QML_IMPORT_PATH:-}" ]; then
 	export QML_IMPORT_PATH="$QML2_IMPORT_PATH"
 fi
@@ -63,9 +56,6 @@ ensure_config_files() {
 		cp -n "${preset_dir}/${file}.json" "${config_dir}/${file}.json" 2>/dev/null || true
 	done
 }
-
-# Call it before launching
-ensure_config_files
 
 show_help() {
 	cat <<EOF
@@ -207,33 +197,7 @@ remove_ambxst_plus_hyprland_block() {
 }
 
 find_ambxst_plus_pid() {
-	# Try to find QuickShell process running shell.qml
-	# QuickShell binary can be named 'qs' or 'quickshell'
-	local pid
-
-	# First try with full path (production/flake mode)
-	pid=$(pgrep -f "qs.*${SCRIPT_DIR}/shell.qml" 2>/dev/null | head -1)
-	if [ -z "$pid" ]; then
-		pid=$(pgrep -f "quickshell.*${SCRIPT_DIR}/shell.qml" 2>/dev/null | head -1)
-	fi
-
-	# If not found, try with relative path (development mode)
-	if [ -z "$pid" ]; then
-		pid=$(pgrep -f "qs.*shell.qml" 2>/dev/null | head -1)
-	fi
-	if [ -z "$pid" ]; then
-		pid=$(pgrep -f "quickshell.*shell.qml" 2>/dev/null | head -1)
-	fi
-
-	# Last resort: find any qs/quickshell process in this directory
-	if [ -z "$pid" ]; then
-		pid=$(pgrep -a "qs" 2>/dev/null | grep -F "$SCRIPT_DIR" | awk '{print $1}' | head -1)
-	fi
-	if [ -z "$pid" ]; then
-		pid=$(pgrep -a quickshell 2>/dev/null | grep -F "$SCRIPT_DIR" | awk '{print $1}' | head -1)
-	fi
-
-	echo "$pid"
+	pgrep -n -f '(^|/)(qs|quickshell) .*shell\.qml' 2>/dev/null || true
 }
 
 find_ambxst_plus_pid_cached() {
@@ -259,6 +223,44 @@ find_ambxst_plus_pid_cached() {
 	# Fallback: use expensive pgrep search
 	pid=$(find_ambxst_plus_pid)
 	echo "$pid"
+}
+
+save_current_brightness() {
+	local save_file="$1"
+	local monitor="${2:-}"
+	local list_script="${SCRIPT_DIR}/scripts/brightness_list.sh"
+
+	if [ -z "$monitor" ]; then
+		bash "$list_script" >"${save_file}.tmp" 2>/dev/null || {
+			echo "Warning: Could not query current brightness"
+			return 0
+		}
+		if [ -f "${save_file}.tmp" ]; then
+			while IFS=: read -r name bright method; do
+				if [ -n "$name" ] && [ -n "$bright" ]; then
+					echo "${name}:${bright}"
+				fi
+			done <"${save_file}.tmp" >"$save_file"
+			rm -f "${save_file}.tmp"
+			echo "Saved current brightness for all monitors"
+		fi
+	else
+		local current_line current
+		current_line=$(bash "$list_script" 2>/dev/null | grep "^${monitor}:")
+		if [ -z "$current_line" ]; then
+			echo "Error: Monitor $monitor not found"
+			return 1
+		fi
+		current=$(echo "$current_line" | cut -d: -f2)
+		if [ -f "$save_file" ]; then
+			grep -v "^${monitor}:" "$save_file" >"${save_file}.tmp" 2>/dev/null || true
+			echo "${monitor}:${current}" >>"${save_file}.tmp"
+			mv "${save_file}.tmp" "$save_file"
+		else
+			echo "${monitor}:${current}" >"$save_file"
+		fi
+		echo "Saved current brightness for $monitor (${current}%)"
+	fi
 }
 
 restart_ambxst_plus() {
@@ -316,15 +318,7 @@ run)
 	}
 	;;
 lock)
-	PID=$(find_ambxst_plus_pid_cached)
-	if [ -z "$PID" ]; then
-		echo "Error: Ambxst[+] is not running"
-		exit 1
-	fi
-	qs ipc --pid "$PID" call 'ambxst+' run lockscreen 2>/dev/null || {
-		echo "Error: Could not activate lockscreen"
-		exit 1
-	}
+	exec "${BASH_SOURCE[0]}" run lockscreen
 	;;
 mic-mute)
 	# Convenience alias for `ambxst+ run mic-mute`
@@ -421,39 +415,7 @@ brightness)
 
 	# Handle save-only flag (no IPC needed)
 	if [ "$ARG2" = "-s" ] || [ "$ARG2" = "--save" ]; then
-		# Just save, no value change
-		MONITOR="${ARG3:-}"
-		if [ -z "$MONITOR" ]; then
-			# Save all monitors
-			bash "${SCRIPT_DIR}/scripts/brightness_list.sh" >"${BRIGHTNESS_SAVE_FILE}.tmp" 2>/dev/null || {
-				echo "Warning: Could not query current brightness"
-			}
-			if [ -f "${BRIGHTNESS_SAVE_FILE}.tmp" ]; then
-				while IFS=: read -r name bright method; do
-					if [ -n "$name" ] && [ -n "$bright" ]; then
-						echo "${name}:${bright}"
-					fi
-				done <"${BRIGHTNESS_SAVE_FILE}.tmp" >"$BRIGHTNESS_SAVE_FILE"
-				rm -f "${BRIGHTNESS_SAVE_FILE}.tmp"
-				echo "Saved current brightness for all monitors"
-			fi
-		else
-			# Save specific monitor
-			CURRENT_LINE=$(bash "${SCRIPT_DIR}/scripts/brightness_list.sh" 2>/dev/null | grep "^${MONITOR}:")
-			if [ -z "$CURRENT_LINE" ]; then
-				echo "Error: Monitor $MONITOR not found"
-				exit 1
-			fi
-			CURRENT=$(echo "$CURRENT_LINE" | cut -d: -f2)
-			if [ -f "$BRIGHTNESS_SAVE_FILE" ]; then
-				grep -v "^${MONITOR}:" "$BRIGHTNESS_SAVE_FILE" >"${BRIGHTNESS_SAVE_FILE}.tmp" 2>/dev/null || true
-				echo "${MONITOR}:${CURRENT}" >>"${BRIGHTNESS_SAVE_FILE}.tmp"
-				mv "${BRIGHTNESS_SAVE_FILE}.tmp" "$BRIGHTNESS_SAVE_FILE"
-			else
-				echo "${MONITOR}:${CURRENT}" >"$BRIGHTNESS_SAVE_FILE"
-			fi
-			echo "Saved current brightness for $MONITOR (${CURRENT}%)"
-		fi
+		save_current_brightness "$BRIGHTNESS_SAVE_FILE" "${ARG3:-}" || exit 1
 		exit 0
 	fi
 
@@ -565,40 +527,7 @@ brightness)
 
 	# Save current brightness if requested
 	if [ "$SAVE_FLAG" = true ]; then
-		if [ -z "$MONITOR" ]; then
-			# Save all monitors - we need to get current brightness
-			# For simplicity, we'll use a helper script to query current brightness
-			bash "${SCRIPT_DIR}/scripts/brightness_list.sh" >"${BRIGHTNESS_SAVE_FILE}.tmp" 2>/dev/null || {
-				echo "Warning: Could not query current brightness"
-			}
-			# Convert format from name:brightness:method to name:brightness
-			if [ -f "${BRIGHTNESS_SAVE_FILE}.tmp" ]; then
-				while IFS=: read -r name bright method; do
-					if [ -n "$name" ] && [ -n "$bright" ]; then
-						echo "${name}:${bright}"
-					fi
-				done <"${BRIGHTNESS_SAVE_FILE}.tmp" >"$BRIGHTNESS_SAVE_FILE"
-				rm -f "${BRIGHTNESS_SAVE_FILE}.tmp"
-				echo "Saved current brightness for all monitors"
-			fi
-		else
-			# Save specific monitor
-			CURRENT_LINE=$(bash "${SCRIPT_DIR}/scripts/brightness_list.sh" 2>/dev/null | grep "^${MONITOR}:")
-			if [ -z "$CURRENT_LINE" ]; then
-				echo "Error: Monitor $MONITOR not found"
-				exit 1
-			fi
-			CURRENT=$(echo "$CURRENT_LINE" | cut -d: -f2)
-			# Update or append to save file
-			if [ -f "$BRIGHTNESS_SAVE_FILE" ]; then
-				grep -v "^${MONITOR}:" "$BRIGHTNESS_SAVE_FILE" >"${BRIGHTNESS_SAVE_FILE}.tmp" 2>/dev/null || true
-				echo "${MONITOR}:${CURRENT}" >>"${BRIGHTNESS_SAVE_FILE}.tmp"
-				mv "${BRIGHTNESS_SAVE_FILE}.tmp" "$BRIGHTNESS_SAVE_FILE"
-			else
-				echo "${MONITOR}:${CURRENT}" >"$BRIGHTNESS_SAVE_FILE"
-			fi
-			echo "Saved current brightness for $MONITOR (${CURRENT}%)"
-		fi
+		save_current_brightness "$BRIGHTNESS_SAVE_FILE" "$MONITOR" || exit 1
 	fi
 
 	# Set brightness
@@ -713,14 +642,14 @@ help | --help | -h)
 	show_help
 	;;
 "")
+	ensure_config_files
+
 	# Run daemon priority script (backgrounded to not block startup)
 	bash "${SCRIPT_DIR}/scripts/daemon_priority.sh" &
 
 	# Set QS_ICON_THEME environment variable
 	if command -v gsettings >/dev/null 2>&1; then
 		export QS_ICON_THEME=$(gsettings get org.gnome.desktop.interface icon-theme | tr -d "'")
-	else
-		echo "DEBUG: gsettings not found in PATH" >&2
 	fi
 
 	# Force Qt6CT

@@ -12,7 +12,6 @@ Item {
     property bool schemeListExpanded: false
     readonly property var matugenSchemes: ["scheme-content", "scheme-expressive", "scheme-fidelity", "scheme-fruit-salad", "scheme-monochrome", "scheme-neutral", "scheme-rainbow", "scheme-tonal-spot"]
     property var presets: GlobalStates.wallpaperManager ? GlobalStates.wallpaperManager.colorPresets : []
-    onPresetsChanged: console.log("SchemeSelector received presets:", presets)
 
     property var combinedModel: {
         var currentPresets = presets; // Explicit dependency

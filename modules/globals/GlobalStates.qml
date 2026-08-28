@@ -25,7 +25,6 @@ Singleton {
             onStreamFinished: {
                 const path = text.trim();
                 if (path) {
-                    console.log("Selected icon:", path);
                     copyIconProcess.command = ["cp", path, Quickshell.env("HOME") + "/.face.icon"];
                     copyIconProcess.running = true;
                 }
@@ -40,7 +39,6 @@ Singleton {
 
         onExited: exitCode => {
             if (exitCode === 0) {
-                console.log("Icon updated successfully");
                 avatarCacheBuster = Date.now();
             } else {
                 console.warn("Failed to update icon");
@@ -48,9 +46,6 @@ Singleton {
         }
     }
 
-    // ═══════════════════════════════════════════════════════════════
-    // COMPOSITOR LAYOUT STATE (persisted via StateService)
-    // ═══════════════════════════════════════════════════════════════
     property string compositorLayout: ""
     property bool compositorLayoutReady: false
     readonly property var availableLayouts: ["dwindle", "master", "scrolling"]
@@ -96,9 +91,7 @@ Singleton {
     }
 
 
-    // Ensure LockscreenService singleton is loaded
     Component.onCompleted: {
-        // Reference the singleton to ensure it loads
         LockscreenService.toString();
         // Fetch the active layout from the compositor
         getLayoutProcess.running = true;

@@ -3549,11 +3549,9 @@ Singleton {
 
     // Handle lightMode changes
     onLightModeChanged: {
-        console.log("lightMode changed to:", lightMode);
         if (GlobalStates.wallpaperManager) {
             var wallpaperManager = GlobalStates.wallpaperManager;
             if (wallpaperManager.currentWallpaper) {
-                console.log("Re-running Matugen due to lightMode change");
                 wallpaperManager.runMatugenForCurrentWallpaper();
             }
         }
@@ -3581,8 +3579,6 @@ Singleton {
         if (notchPosition === "bottom") {
             // Conflict with Dock?
             if (dock.position === "bottom") {
-                console.log("Notch moved to bottom, adjusting Dock position...");
-                // Offset Dock to avoid notch
                 if (bar.position === "left") {
                     dock.position = "right";
                 } else {
@@ -3597,7 +3593,6 @@ Singleton {
         else if (notchPosition === "top") {
             // Restore Dock if displaced
             if (dock.position === "left" || dock.position === "right") {
-                console.log("Notch moved to top, restoring Dock to bottom...");
                 dock.position = "bottom";
                 root.saveDock();
             }

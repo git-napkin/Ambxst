@@ -151,12 +151,7 @@ Singleton {
             cmdArgs = ["system", "execute", command];
         }
 
-        let finalCommand = ["axctl"].concat(cmdArgs.filter(x => x !== "" && x !== undefined));
-
-        let proc = Qt.createQmlObject('import Quickshell.Io; Process {}', root);
-        proc.command = finalCommand;
-        proc.onExited.connect(() => proc.destroy());
-        proc.running = true;
+        Quickshell.execDetached(["axctl"].concat(cmdArgs.filter(x => x !== "" && x !== undefined)));
     }
 
     function monitorFor(screen) {
@@ -355,11 +350,6 @@ Singleton {
     property Process axctlProcess: Process {
         command: ["axctl", "-c", root.configPath, "daemon"]
         running: true
-        stdout: SplitParser {
-            onRead: (data) => {
-                // Daemon logs can be printed here if needed
-            }
-        }
         onExited: (code) => {
             console.warn("axctl daemon exited with code:", code)
         }

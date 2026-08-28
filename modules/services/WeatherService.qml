@@ -496,36 +496,28 @@ Singleton {
 
     onConfigLocationChanged: {
         if (!_initialized) return;
-        console.log("WeatherService: Location changed to '" + configLocation + "'");
         Qt.callLater(() => { updateWeather(); });
     }
     onConfigUnitChanged: {
         if (!_initialized) return;
-        console.log("WeatherService: Unit changed to '" + configUnit + "'");
         Qt.callLater(() => { updateWeather(); });
     }
 
     function updateWeather() {
-        // Cancel existing process if running
         if (weatherProcess.running) {
             root.wasCancelled = true;
             weatherProcess.running = false;
         }
 
-        // Safety check for config
-        if (!Config.weather) {
-            console.warn("WeatherService: Config.weather is null");
+        if (!Config.weather)
             return;
-        }
 
         root.isLoading = true;
         root.hasFailed = false;
 
         var locationStr = Config.weather.location || "";
         var location = locationStr.trim();
-        
-        console.log("WeatherService: Fetching weather for '" + location + "'");
-        
+
         weatherProcess.command = [scriptPath, location, String(Config.weather.cacheTtl)];
         weatherProcess.running = true;
     }

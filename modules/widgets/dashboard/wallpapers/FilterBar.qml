@@ -174,16 +174,12 @@ FocusScope {
 
         // Función para actualizar filtros dinámicamente
         function updateFilters() {
-            console.log("Updating filters in FilterBar");
-            // Limpiar filtros de subcarpetas existentes
             for (var i = filterModel.count - 1; i >= 3; i--) {
                 filterModel.remove(i);
             }
 
-            // Agregar filtros de subcarpetas
             if (GlobalStates.wallpaperManager && GlobalStates.wallpaperManager.subfolderFilters) {
                 var subfolders = GlobalStates.wallpaperManager.subfolderFilters;
-                console.log("Adding subfolder filters:", subfolders);
                 for (var j = 0; j < subfolders.length; j++) {
                     filterModel.append({
                         label: subfolders[j],
@@ -191,7 +187,6 @@ FocusScope {
                     });
                 }
             }
-            console.log("Filter model now has", filterModel.count, "items");
         }
 
         // Actualizar filtros cuando cambien las subcarpetas

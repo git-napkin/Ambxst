@@ -15,6 +15,7 @@ Python and Bash backend utilities invoked by QML services via `Quickshell.Io.Pro
 | `qr_scan.sh` | Bash | Tools | QR/barcode scanning from screen capture |
 | `google_lens.sh` | Bash | Tools | Google Lens image search |
 | `thumbgen.py` | Python | `WallpapersTab` | Wallpaper thumbnail generation |
+| `desktop_scan.py` | Python | `DesktopService.qml` | Desktop folder listing + .desktop Name/Icon parse |
 | `desktop_thumbgen.py` | Python | `DesktopService.qml` | Desktop icon thumbnail generation |
 | `lockwall.py` | Python | `LockScreen.qml` | Lockscreen wallpaper blur preprocessing |
 | `brightness_list.sh` | Bash | `Brightness.qml` | Enumerates available brightness devices |
@@ -24,7 +25,7 @@ Python and Bash backend utilities invoked by QML services via `Quickshell.Io.Pro
 | `sleep_monitor.sh` | Bash | `SuspendManager` | Monitors system sleep/wake events |
 | `loginlock.sh` | Bash | `LockScreen` | Login lock coordination |
 | `daemon_priority.sh` | Bash | Shell init | Process priority adjustment |
-| `camera_monitor.py` | Python | `CameraService.qml` | Camera enumeration + in-use detection via /proc fd scan |
+| `camera_monitor.py` | Python | `CameraService.qml` | Long-running camera enumeration + in-use detection via /proc fd scan |
 
 ## CONVENTIONS
 - **Communication**: Scripts output to stdout; QML reads via `Process` + `SplitParser` or `StdioCollector`.

@@ -51,7 +51,6 @@ Singleton {
     property int maxHistoryPoints: 50
     property int totalDataPoints: 0
 
-    // Update interval
     property int updateInterval: 2000
 
     // Unified monitor process.
@@ -107,7 +106,6 @@ Singleton {
                         return;
                     }
 
-                    // Update metrics
                     if (stats.cpu) {
                         root.cpuUsage = stats.cpu.usage;
                         root.cpuTemp = stats.cpu.temp;
@@ -169,7 +167,6 @@ Singleton {
     function updateHistory() {
         totalDataPoints++;
         
-        // Helper to update history arrays
         const pushHistory = (arr, val) => {
             let next = arr.slice();
             next.push(val);

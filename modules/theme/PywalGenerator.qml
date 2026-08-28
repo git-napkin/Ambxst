@@ -7,43 +7,23 @@ QtObject {
     id: root
 
     function generate(Colors) {
-        console.log("PywalGenerator: generate() called")
-        if (!Colors) {
-            console.error("PywalGenerator: Colors is null/undefined")
+        if (!Colors)
             return
-        }
 
         try {
             const fmt = (c) => c.toString()
-            
-            // Safely get wallpaper image
+
             let image = ""
             if (typeof GlobalStates !== "undefined" && GlobalStates.wallpaperManager) {
                 image = GlobalStates.wallpaperManager.currentWallpaper || ""
-            } else {
-                console.warn("PywalGenerator: GlobalStates.wallpaperManager unavailable. Wallpaper path will be empty.")
             }
 
-            console.log("PywalGenerator: Using wallpaper:", image)
-
-            // Helper to escape double quotes for shell echo
             const escape = (str) => {
                 if (!str) return ""
                 return str.toString().replace(/\\/g, "\\\\").replace(/"/g, '\\"')
             }
-            
-            // Helper to darken color (percent 0-100)
-            const darken = (c, percent) => {
-                try {
-                    // Qt.tint takes (source, tintColor). 
-                    // To darken, we tint with black having alpha = percent/100.
-                    // Qt.rgba(r,g,b,a) takes values 0.0-1.0
-                    return Qt.tint(c, Qt.rgba(0, 0, 0, percent / 100)).toString()
-                } catch (err) {
-                    console.error("PywalGenerator: Error darkening color:", c, err)
-                    return "#000000"
-                }
-            }
+
+            const darken = (c, percent) => Qt.tint(c, Qt.rgba(0, 0, 0, percent / 100)).toString()
 
             // 1. ~/.cache/wal/colors
             let c0 = fmt(Colors.background)       

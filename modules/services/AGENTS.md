@@ -24,7 +24,7 @@ Backend singletons bridging Wayland protocols, CLI tools (nmcli, upower, wpctl, 
 | **App Search** | `AppSearch.qml` | Application indexing for launcher |
 | **Weather** | `WeatherService.qml` | Forecast, sunrise/sunset, day/night detection |
 | **Keybinds** | `GlobalShortcuts.qml` | Compositor-level keybind management |
-| **Camera** | `CameraService.qml` | Camera enumeration + in-use privacy indicator (`camera_monitor.py`) |
+| **Camera** | `CameraService.qml` | Camera enumeration + in-use privacy indicator (`camera_monitor.py`, long-running) |
 
 ## CONVENTIONS
 - **Singleton pattern**: `pragma Singleton` + `Singleton { id: root }` root component.

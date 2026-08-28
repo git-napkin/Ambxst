@@ -169,17 +169,11 @@ PopupWindow {
         if (visible)
             return;
 
-        // Set logical state immediately
         isOpen = true;
-
-        // Reset animation state
         popupOpacity = 0;
         popupScale = 0.9;
-
-        // Show popup
         visible = true;
 
-        // Start animation after a frame
         Qt.callLater(() => {
             popupOpacity = 1;
             popupScale = 1;
@@ -191,15 +185,10 @@ PopupWindow {
         if (!visible)
             return;
 
-        // Set logical state immediately
         isOpen = false;
         focusActive = false;
-
-        // Animate out
         popupOpacity = 0;
         popupScale = 0.9;
-
-        // Hide after animation
         closeTimer.restart();
     }
 

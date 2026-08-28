@@ -10,36 +10,29 @@ import qs.modules.services
 Singleton {
     id: root
 
-    // Check pin status
     function isPinned(appId) {
         const pinnedApps = Config.pinnedApps?.apps || [];
         return pinnedApps.some(id => id.toLowerCase() === appId.toLowerCase());
     }
 
-    // Toggle pin
     function togglePin(appId) {
         let pinnedApps = Config.pinnedApps?.apps || [];
         const normalizedAppId = appId.toLowerCase();
-        
+
         if (isPinned(appId)) {
-            // Unpin
             Config.pinnedApps.apps = pinnedApps.filter(id => id.toLowerCase() !== normalizedAppId);
         } else {
-            // Pin
             Config.pinnedApps.apps = pinnedApps.concat([appId]);
         }
 
-        // Persist changes
         Config.savePinnedApps();
     }
 
-    // Get entry
     function getDesktopEntry(appId) {
         if (!appId) return null;
         return DesktopEntries.heuristicLookup(appId) || null;
     }
 
-    // Launch
     function launchApp(appId) {
         const entry = getDesktopEntry(appId);
         if (entry) {
@@ -47,18 +40,12 @@ Singleton {
         }
     }
 
-    // Cache entries
     property var _appCache: ({})
     property var _previousKeys: []
-
-    // Cached ignored-app regexes (keyed by the source string list)
     property var _ignoredRegexKey: null
     property var _ignoredRegexCache: null
-
-    // Combined app list
     property list<var> apps: []
 
-    // Debounce update
     Timer {
         id: updateTimer
         interval: 100
@@ -66,7 +53,6 @@ Singleton {
         onTriggered: root._updateApps()
     }
 
-    // Update on toplevel change
     Connections {
         target: ToplevelManager.toplevels
         function onObjectInsertedPost() {
@@ -77,7 +63,6 @@ Singleton {
         }
     }
 
-    // Update on config change
     Connections {
         target: Config.pinnedApps ?? null
         function onAppsChanged() {
@@ -92,20 +77,15 @@ Singleton {
         }
     }
 
-    // Init
     Component.onCompleted: {
         _updateApps();
     }
 
     function _updateApps() {
         var map = new Map();
-
-        // Get config
         const pinnedApps = Config.pinnedApps?.apps ?? [];
         const ignoredRegexStrings = Config.dock?.ignoredAppRegexes ?? [];
 
-        // Cache compiled regexes keyed on the config array; recompiling on every
-        // rebuild (up to 10x/sec during window churn) is pure waste.
         let ignoredRegexes = root._ignoredRegexCache;
         if (!ignoredRegexes || root._ignoredRegexKey !== ignoredRegexStrings) {
             ignoredRegexes = ignoredRegexStrings.map(pattern => new RegExp(pattern, "i"));
@@ -113,7 +93,6 @@ Singleton {
             root._ignoredRegexCache = ignoredRegexes;
         }
 
-        // Add pinned
         for (const appId of pinnedApps) {
             const key = appId.toLowerCase();
             if (!map.has(key)) {
@@ -125,23 +104,17 @@ Singleton {
             }
         }
 
-        // Collect unpinned
         var unpinnedRunningApps = new Map();
         const toplevels = ToplevelManager.toplevels.values;
         for (let i = 0; i < toplevels.length; i++) {
             const toplevel = toplevels[i];
-            // Skip ignored
             if (ignoredRegexes.some(re => re.test(toplevel.appId))) continue;
-            
+
             const key = toplevel.appId.toLowerCase();
-            
-            // Check if pinned
+
             if (map.has(key)) {
-                // Add to pinned app
                 map.get(key).toplevels.push(toplevel);
             } else {
-                // Track unpinned (Map lookup is O(1), not O(n) like the old
-                // linear scan over the array of unique apps)
                 const existing = unpinnedRunningApps.get(key);
                 if (!existing) {
                     unpinnedRunningApps.set(key, {
@@ -155,8 +128,7 @@ Singleton {
             }
         }
 
-        // Add separator if needed
-        if (pinnedApps.length > 0 && unpinnedRunningApps.length > 0) {
+        if (pinnedApps.length > 0 && unpinnedRunningApps.size > 0) {
             map.set("SEPARATOR", { 
                 appId: "SEPARATOR", 
                 pinned: false, 
@@ -164,7 +136,6 @@ Singleton {
             });
         }
 
-        // Add unpinned to map
         for (const [appKey, app] of unpinnedRunningApps) {
             map.set(appKey, {
                 appId: app.appId,
@@ -173,10 +144,8 @@ Singleton {
             });
         }
 
-        // New keys list
         var newKeys = Array.from(map.keys());
 
-        // Cleanup entries
         for (const oldKey of _previousKeys) {
             if (!map.has(oldKey) && _appCache[oldKey]) {
                 _appCache[oldKey].destroy();
@@ -184,13 +153,9 @@ Singleton {
             }
         }
 
-        // Sync entries
         var values = [];
         for (const [key, value] of map) {
             if (_appCache[key]) {
-                // Update entry — only assign when content actually changed, so
-                // consumers don't get spurious change notifications on every
-                // rebuild (rebuilds run up to 10x/sec during window churn).
                 if (!_arraysEqual(_appCache[key].toplevels, value.toplevels)) {
                     _appCache[key].toplevels = value.toplevels;
                 }
@@ -199,7 +164,6 @@ Singleton {
                 }
                 values.push(_appCache[key]);
             } else {
-                // Create entry
                 const entry = appEntryComp.createObject(root, { 
                     appId: value.appId, 
                     toplevels: value.toplevels, 
@@ -212,9 +176,6 @@ Singleton {
 
         _previousKeys = newKeys;
 
-        // Reassign `apps` only when the entry list itself changed (add/remove/
-        // reorder); per-entry updates propagate via their own change signals.
-        // This avoids a full model re-evaluation cascade on every rebuild.
         let listChanged = root.apps.length !== values.length;
         if (!listChanged) {
             for (let i = 0; i < root.apps.length; i++) {
@@ -237,7 +198,6 @@ Singleton {
         return true;
     }
 
-    // App entry component
     component TaskbarAppEntry: QtObject {
         required property string appId
         property var toplevels: []

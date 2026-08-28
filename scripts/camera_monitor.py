@@ -1,21 +1,19 @@
 #!/usr/bin/env python3
-"""Camera device enumeration and in-use detection.
+"""Camera enumeration and in-use detection.
 
-Lists cameras from /dev/video* (names via /sys/class/video4linux) and detects
-whether any application currently holds a camera device open by scanning
-/proc/*/fd for links into /dev/video*. Pure Python, no v4l2 tooling required.
+Lists /dev/video* (names from /sys/class/video4linux) and detects open cameras
+by matching /proc/*/fd device numbers. Prints one JSON object per line.
 
-Outputs JSON to stdout:
-{"cameras": [{"name": ..., "node": ...}], "inUse": true, "users": ["pid:name"]}
+With an interval argument (seconds), loops so the QML service can keep one
+interpreter alive instead of paying startup on every poll.
 """
 
 import json
 import os
-import re
 import sys
+import time
 
 VIDEO4LINUX = "/sys/class/video4linux"
-DEV_PREFIX = "/dev/video"
 
 
 def _camera_name(node):
@@ -53,7 +51,6 @@ def _list_cameras():
 
 
 def _open_camera_users(cameras):
-    """Return [pid] list of processes holding any camera device open."""
     if not cameras:
         return []
     dev_numbers = set()
@@ -66,24 +63,22 @@ def _open_camera_users(cameras):
         return []
 
     users = []
-    proc_dir = "/proc"
     try:
-        entries = os.listdir(proc_dir)
+        entries = os.listdir("/proc")
     except OSError:
         return users
 
     for entry in entries:
         if not entry.isdigit():
             continue
-        fd_dir = os.path.join(proc_dir, entry, "fd")
+        fd_dir = os.path.join("/proc", entry, "fd")
         try:
             fds = os.listdir(fd_dir)
         except OSError:
             continue
         for fd in fds:
-            link = os.path.join(fd_dir, fd)
             try:
-                st = os.stat(link)
+                st = os.stat(os.path.join(fd_dir, fd))
             except OSError:
                 continue
             if st.st_rdev in dev_numbers:
@@ -100,16 +95,35 @@ def _proc_name(pid):
         return "?"
 
 
-def main():
+def emit():
     cameras = _list_cameras()
     users = _open_camera_users(cameras)
-    result = {
-        "cameras": cameras,
-        "inUse": len(users) > 0,
-        "users": [{"pid": pid, "name": _proc_name(pid)} for pid in users],
-    }
-    json.dump(result, sys.stdout)
+    json.dump(
+        {
+            "cameras": cameras,
+            "inUse": len(users) > 0,
+            "users": [{"pid": pid, "name": _proc_name(pid)} for pid in users],
+        },
+        sys.stdout,
+    )
     sys.stdout.write("\n")
+    sys.stdout.flush()
+
+
+def main():
+    interval = None
+    if len(sys.argv) > 1:
+        try:
+            interval = float(sys.argv[1])
+        except ValueError:
+            interval = None
+
+    if interval and interval > 0:
+        while True:
+            emit()
+            time.sleep(interval)
+    else:
+        emit()
 
 
 if __name__ == "__main__":

@@ -111,15 +111,10 @@ PanelWindow {
             QsMenuOpener {
                 id: menuOpener
                 menu: contextWindow.menuHandle
-
-                onChildrenChanged: {
-                    console.log("Menu children changed, count:", children ? children.values.length : "null");
-                }
             }
 
             items: {
                 if (contextWindow.customItems && contextWindow.customItems.length > 0) {
-                    console.log("Using custom items:", contextWindow.customItems.length);
                     return contextWindow.customItems.map(item => ({
                         text: item.text || "",
                         icon: item.icon || "",
@@ -142,21 +137,14 @@ PanelWindow {
                     return [];
                 }
 
-                console.log("Building menu items from systray...");
-                console.log("menuHandle:", contextWindow.menuHandle);
-                console.log("menuOpener.children:", menuOpener.children);
-
                 if (!menuOpener.children || !menuOpener.children.values) {
-                    console.log("No children values available");
                     return [];
                 }
 
                 let menuItems = [];
-                console.log("Children count:", menuOpener.children.values.length);
 
                 for (let i = 0; i < menuOpener.children.values.length; i++) {
                     let entry = menuOpener.children.values[i];
-                    console.log("Entry", i, ":", entry, "isSeparator:", entry ? entry.isSeparator : "null", "text:", entry ? entry.text : "null", "icon:", entry ? entry.icon : "null");
 
                     if (entry) {
                         if (entry.isSeparator) {
@@ -184,15 +172,7 @@ PanelWindow {
                                 }
                             }
 
-                            if (originalText !== cleanText) {
-                                console.log("Text cleaned - Original:", originalText, "-> Clean:", cleanText);
-                            }
-                            if (entry.icon) {
-                                console.log("Icon processed - Original:", entry.icon, "-> Used:", iconToUse, "isImage:", useImageIcon);
-                            }
-
                             if (cleanText === "" && iconToUse === "") {
-                                console.log("Skipping entry with no valid text or icon:", originalText);
                                 continue;
                             }
 
@@ -203,7 +183,6 @@ PanelWindow {
                                 enabled: entry.enabled !== false,
                                 isSeparator: false,
                                 onTriggered: function () {
-                                    console.log("Triggering menu item:", cleanText);
                                     let callback = entry.triggered;
                                     contextWindow.close();
                                     if (callback) {
@@ -214,14 +193,12 @@ PanelWindow {
                         }
                     }
                 }
-                console.log("Final menu items count:", menuItems.length);
                 return menuItems;
             }
         }
     }
 
     function openMenu(handle) {
-        console.log("Opening context menu");
         menuHandle = handle;
         customItems = [];
         menuType = "";
@@ -231,7 +208,6 @@ PanelWindow {
     }
 
     function openCustomMenu(items, width, height, type) {
-        console.log("Opening custom context menu with", items.length, "items");
         menuHandle = null;
         customItems = items;
         menuType = type || "";
@@ -246,7 +222,6 @@ PanelWindow {
     }
 
     function close() {
-        console.log("Closing context menu");
         menu.hoveredIndex = -1;
         menu.previousHoveredIndex = -1;
         menu.close();

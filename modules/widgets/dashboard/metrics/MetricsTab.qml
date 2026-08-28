@@ -72,70 +72,51 @@ Rectangle {
         const savedZoom = StateService.get("metricsChartZoom", 1.0);
         // Limit zoom range: 0.2 (show all available) to 3.0 (zoom in)
         chartZoom = Math.max(0.2, Math.min(3.0, savedZoom));
-
-        hostnameReader.running = true;
-        osReader.running = true;
-        linuxLogosReader.running = true;
     }
 
-    // Load Linux logos JSON
-    Process {
-        id: linuxLogosReader
-        running: false
-        command: ["cat", Qt.resolvedUrl("../../../../assets/linux-logos.json").toString().replace("file://", "")]
-
-        stdout: StdioCollector {
-            waitForEnd: true
-            onStreamFinished: {
-                try {
-                    if (!text || text.trim().length === 0) {
-                        console.warn("linux-logos.json is empty");
-                        return;
-                    }
-                    root.linuxLogos = JSON.parse(text);
-                    console.log("Loaded", Object.keys(root.linuxLogos).length, "Linux logos");
-                } catch (e) {
-                    console.warn("Failed to parse linux-logos.json:", e);
-                    console.warn("Text received:", text.substring(0, 100));
-                }
+    FileView {
+        id: linuxLogosFile
+        path: Qt.resolvedUrl("../../../../assets/linux-logos.json").toString().replace("file://", "")
+        printErrors: false
+        onLoaded: {
+            try {
+                const raw = text().trim();
+                if (raw.length > 0)
+                    root.linuxLogos = JSON.parse(raw);
+            } catch (e) {
+                console.warn("Failed to parse linux-logos.json:", e);
             }
         }
     }
 
-    // Get hostname
-    Process {
-        id: hostnameReader
-        running: false
-        command: ["hostname"]
-
-        stdout: StdioCollector {
-            waitForEnd: true
-            onStreamFinished: {
-                const host = text.trim();
-                if (host) {
-                    root.hostname = host.charAt(0).toUpperCase() + host.slice(1);
-                }
-            }
+    FileView {
+        id: hostnameFile
+        path: "/etc/hostname"
+        printErrors: false
+        onLoaded: {
+            const host = text().trim();
+            if (host)
+                root.hostname = host.charAt(0).toUpperCase() + host.slice(1);
         }
     }
 
-    // Get OS name
-    Process {
-        id: osReader
-        running: false
-        command: ["sh", "-c", "grep PRETTY_NAME /etc/os-release | cut -d= -f2 | tr -d '\"'"]
-
-        stdout: StdioCollector {
-            waitForEnd: true
-            onStreamFinished: {
-                const os = text.trim();
-                if (os) {
-                    root.osName = os;
-                    // Only set icon if logos are already loaded
-                    if (root.linuxLogos) {
-                        const icon = getOsIcon(os);
-                        root.osIcon = icon || "";
+    FileView {
+        id: osReleaseFile
+        path: "/etc/os-release"
+        printErrors: false
+        onLoaded: {
+            const lines = text().split("\n");
+            for (let i = 0; i < lines.length; i++) {
+                if (lines[i].startsWith("PRETTY_NAME=")) {
+                    const os = lines[i].substring(12).replace(/^"|"$/g, "").trim();
+                    if (os) {
+                        root.osName = os;
+                        if (root.linuxLogos) {
+                            const icon = getOsIcon(os);
+                            root.osIcon = icon || "";
+                        }
                     }
+                    break;
                 }
             }
         }

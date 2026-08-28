@@ -58,15 +58,10 @@ QtObject {
             }
         }
 
-        stdout: StdioCollector {
-            onStreamFinished: {
-                // When watcher outputs something, refresh the list
-                var lines = text.trim().split('\n');
-                for (var i = 0; i < lines.length; i++) {
-                    if (lines[i] === "REFRESH_LIST") {
-                        Qt.callLater(root.list);
-                    }
-                }
+        stdout: SplitParser {
+            onRead: line => {
+                if (line === "REFRESH_LIST")
+                    Qt.callLater(root.list);
             }
         }
         
@@ -248,35 +243,6 @@ QtObject {
                 root.listCompleted();
                 root._operationInProgress = false;
             }
-        }
-    }
-
-    // Insert item into database - kept for backwards compatibility but deprecated
-    property Process insertProcess: Process {
-        property string itemHash: ""
-        property string itemContent: ""
-        property string tmpFile: ""
-        running: false
-        
-        stderr: StdioCollector {
-            onStreamFinished: {
-                if (text.length > 0) {
-                    console.warn("ClipboardService: insertProcess stderr:", text);
-                }
-            }
-        }
-        
-        onExited: function(code) {
-            if (code === 0) {
-                Qt.callLater(root.list);
-            } else {
-                console.warn("ClipboardService: insertProcess failed with code:", code);
-                root._operationInProgress = false;
-            }
-            
-            itemHash = "";
-            itemContent = "";
-            tmpFile = "";
         }
     }
 
@@ -540,36 +506,6 @@ QtObject {
         _operationInProgress = true;
         checkAndInsertProcess.command = [checkScriptPath, dbPath, insertScriptPath, binaryDataDir];
         checkAndInsertProcess.running = true;
-    }
-
-    function getImageHash(mimeType) {
-        // Deprecated - now handled by clipboard_check.sh
-    }
-
-    function insertTextItemFromFile(hash, tmpFile) {
-        // Deprecated - now handled by clipboard_check.sh
-    }
-    
-    function insertFileItemFromFile(hash, tmpFile) {
-        // Deprecated - now handled by clipboard_check.sh
-    }
-    
-    property Process writeTmpProcess: Process {
-        property string itemHash: ""
-        property string itemContent: ""
-        running: false
-        
-        stdout: StdioCollector {
-            waitForEnd: true
-            
-            onStreamFinished: {
-                // Deprecated
-            }
-        }
-    }
-
-    function insertImageItem(hash, mimeType) {
-        // Deprecated - now handled by clipboard_check.sh
     }
 
     function list() {

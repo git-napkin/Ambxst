@@ -1,7 +1,6 @@
 .pragma library
 
 function generate(paletteColors) {
-    // Safety check
     if (!paletteColors || paletteColors.length === 0) {
         // Return a passthrough shader if no palette
         return `//!HOOK MAIN
@@ -83,9 +82,6 @@ vec4 hook() {
     } else {
         finalColor = closestColor;
     }
-    
-    // Mix in the closest color slightly to reinforce structure if the blend is too muddy
-    // finalColor = mix(finalColor, closestColor, 0.2);
 
     return vec4(finalColor, tex.a);
 }
