@@ -153,5 +153,77 @@ class TestDesktopScan(unittest.TestCase):
             self.assertNotIn(".hidden", items)
 
 
+REPO_ROOT = Path(__file__).parent.parent
+
+
+class TestJustWorksContracts(unittest.TestCase):
+    """Source contracts for daemon lifetime, IPC, and clock tick rate."""
+
+    def _read(self, *parts):
+        return REPO_ROOT.joinpath(*parts).read_text()
+
+    def test_ipc_pipe_uses_runtime_dir(self):
+        cli = self._read("cli.sh")
+        shortcuts = self._read("modules/services/GlobalShortcuts.qml")
+        self.assertIn('PIPE="${XDG_RUNTIME_DIR:-/tmp}/ambxst+_ipc.pipe"', cli)
+        self.assertNotIn('PIPE="/tmp/ambxst+_ipc.pipe"', cli)
+        self.assertIn("XDG_RUNTIME_DIR", shortcuts)
+        self.assertNotIn('"/tmp/ambxst+_ipc.pipe"', shortcuts)
+
+    def test_loginlock_steals_held_lock(self):
+        src = self._read("scripts/loginlock.sh")
+        self.assertIn('kill "$pid"', src)
+        self.assertNotIn("exit 0", src)
+
+    def test_sleep_monitor_steals_held_lock(self):
+        src = self._read("scripts/sleep_monitor.sh")
+        self.assertIn('kill "$pid"', src)
+        self.assertNotIn("exit 0", src)
+
+    def test_idle_service_restarts_monitors_on_clean_exit(self):
+        src = self._read("modules/services/IdleService.qml")
+        self.assertNotIn("if (exitCode !== 0)", src)
+        self.assertIn("loginLockRestartTimer", src)
+        self.assertIn("sleepMonitorRestartTimer", src)
+
+    def test_clock_uses_system_clock_minutes(self):
+        src = self._read("modules/bar/clock/Clock.qml")
+        self.assertIn("SystemClock", src)
+        self.assertIn("SystemClock.Minutes", src)
+
+    def test_idle_inhibitor_uses_argv(self):
+        src = self._read("modules/services/IdleInhibitor.qml")
+        self.assertIn("idle-inhibitor-create", src)
+        self.assertNotIn('["sh", "-c", cmd]', src)
+        self.assertNotIn('command: ["sh", "-c", ""]', src)
+
+    def test_camera_watcher_has_restart_cap(self):
+        src = self._read("modules/services/CameraService.qml")
+        self.assertIn("_restartCap", src)
+
+    def test_axctl_restore_focus_reuses_process(self):
+        src = self._read("modules/services/AxctlService.qml")
+        self.assertNotIn("Qt.createQmlObject", src)
+
+    def test_weather_missing_tools_returns_error_json(self):
+        import shutil
+        import subprocess
+
+        bash = shutil.which("bash") or "/bin/bash"
+        env = os.environ.copy()
+        env["PATH"] = "/nonexistent"
+        result = subprocess.run(
+            [bash, str(SCRIPTS_DIR / "weather.sh")],
+            capture_output=True,
+            text=True,
+            env=env,
+            check=False,
+        )
+        self.assertNotEqual(result.returncode, 0)
+        payload = json.loads(result.stdout.strip().split("\n")[-1])
+        self.assertIn("error", payload)
+        self.assertIn("missing", payload["error"])
+
+
 if __name__ == "__main__":
     unittest.main(verbosity=2)

@@ -17,6 +17,8 @@ Singleton {
     // Login Lock Daemon
     // Helper script that listens to Lock signal and reports LOCK events;
     // IdleService owns execution of the configured lock command.
+    property bool _shuttingDown: false
+
     property var loginLockProc: Process {
         id: loginLockProc
         running: true
@@ -31,10 +33,10 @@ Singleton {
         }
 
         onExited: exitCode => {
-            if (exitCode !== 0) {
-                console.warn("loginlock.sh exited with code " + exitCode + ". Restarting...");
-                loginLockRestartTimer.start();
-            }
+            if (root._shuttingDown)
+                return;
+            console.warn("loginlock.sh exited with code " + exitCode + ". Restarting...");
+            loginLockRestartTimer.start();
         }
     }
 
@@ -67,10 +69,10 @@ Singleton {
         }
 
         onExited: exitCode => {
-            if (exitCode !== 0) {
-                console.warn("sleep_monitor.sh exited with code " + exitCode + ". Restarting...");
-                sleepMonitorRestartTimer.start();
-            }
+            if (root._shuttingDown)
+                return;
+            console.warn("sleep_monitor.sh exited with code " + exitCode + ". Restarting...");
+            sleepMonitorRestartTimer.start();
         }
     }
 
@@ -178,4 +180,6 @@ Singleton {
         root.elapsedIdleTime = 0;
         root.triggeredListeners = [];
     }
+
+    Component.onDestruction: root._shuttingDown = true
 }

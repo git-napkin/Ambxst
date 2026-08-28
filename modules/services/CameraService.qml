@@ -22,6 +22,9 @@ Singleton {
 
     readonly property string scriptPath: Qt.resolvedUrl("../../scripts/camera_monitor.py").toString().replace("file://", "")
 
+    property int _restartAttempts: 0
+    readonly property int _restartCap: 10
+
     property Process cameraProcess: Process {
         command: ["python3", root.scriptPath, String(root.pollInterval / 1000)]
         running: false
@@ -32,6 +35,7 @@ Singleton {
                     return;
                 try {
                     root.updateFromData(JSON.parse(data));
+                    root._restartAttempts = 0;
                 } catch (e) {
                     console.warn("CameraService: failed to parse monitor output");
                 }
@@ -39,8 +43,14 @@ Singleton {
         }
 
         onExited: {
-            if (!SuspendManager.isSuspending)
-                restartTimer.restart();
+            if (SuspendManager.isSuspending)
+                return;
+            root._restartAttempts++;
+            if (root._restartAttempts >= root._restartCap) {
+                console.warn("CameraService: restart cap reached, giving up until the next init/suspend cycle");
+                return;
+            }
+            restartTimer.restart();
         }
     }
 
@@ -48,13 +58,16 @@ Singleton {
         interval: 5000
         repeat: false
         onTriggered: {
-            if (!SuspendManager.isSuspending)
+            if (!SuspendManager.isSuspending && root._restartAttempts < root._restartCap)
                 cameraProcess.running = true;
         }
     }
 
     function _syncRunning() {
-        cameraProcess.running = !SuspendManager.isSuspending;
+        if (SuspendManager.isSuspending)
+            cameraProcess.running = false;
+        else if (root._restartAttempts < root._restartCap)
+            cameraProcess.running = true;
     }
 
     property var suspendConnections: Connections {
@@ -63,6 +76,7 @@ Singleton {
             root._syncRunning();
         }
         function onWakingUp() {
+            root._restartAttempts = 0;
             root._syncRunning();
         }
     }

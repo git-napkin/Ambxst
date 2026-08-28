@@ -292,7 +292,7 @@ refresh)
 run)
 	shift
 	CMD="$*"
-	PIPE="/tmp/ambxst+_ipc.pipe"
+	PIPE="${XDG_RUNTIME_DIR:-/tmp}/ambxst+_ipc.pipe"
 
 	if [ -z "$CMD" ]; then
 		echo "Error: No command specified for run"

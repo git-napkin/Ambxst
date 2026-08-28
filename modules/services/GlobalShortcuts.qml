@@ -6,28 +6,34 @@ import qs.modules.globals
 import qs.modules.services
 import qs.config
 
+import Quickshell
 import Quickshell.Io
 
 QtObject {
     id: root
 
     readonly property string appId: "ambxst+"
-    readonly property string ipcPipe: "/tmp/ambxst+_ipc.pipe"
+    readonly property string ipcPipe: (Quickshell.env("XDG_RUNTIME_DIR") || "/tmp") + "/ambxst+_ipc.pipe"
+    property bool _shuttingDown: false
 
-    // Restart the IPC pipe reader if it exits unexpectedly (OOM, /tmp cleared,
-    // hot-reload race, etc.) so the command channel never dies silently.
     property Timer pipeRestartTimer: Timer {
         interval: 1000
         repeat: false
         onTriggered: {
-            if (!SuspendManager.isSuspending)
+            if (!root._shuttingDown && !SuspendManager.isSuspending)
                 root.pipeListener.running = true;
         }
     }
 
-    // High-performance Pipe Listener (Daemon mode)
     property Process pipeListener: Process {
-        command: ["bash", "-c", "rm -f " + root.ipcPipe + "; mkfifo " + root.ipcPipe + "; tail -f " + root.ipcPipe]
+        command: ["bash", "-c",
+            "runtime=\"${XDG_RUNTIME_DIR:-/tmp}\"; " +
+            "pipe=\"$runtime/ambxst+_ipc.pipe\"; " +
+            "mkdir -p \"$runtime\"; " +
+            "if [ ! -p \"$pipe\" ]; then rm -f \"$pipe\"; mkfifo -m 600 \"$pipe\"; fi; " +
+            "chmod 600 \"$pipe\" 2>/dev/null || true; " +
+            "while true; do cat \"$pipe\" || sleep 0.2; done"
+        ]
         running: true
 
         stdout: SplitParser {
@@ -40,11 +46,12 @@ QtObject {
         }
 
         onExited: (code) => {
-            // Restart on abnormal exit; a clean stop (e.g. shell shutdown) is 0.
-            if (code !== 0 && !SuspendManager.isSuspending)
+            if (!root._shuttingDown && !SuspendManager.isSuspending)
                 root.pipeRestartTimer.restart();
         }
     }
+
+    Component.onDestruction: root._shuttingDown = true
 
     // Super keys bound with the release flag (launcher/dashboard) would also
     // fire after a chord (e.g. SUPER + T): Hyprland has no "exclude when part

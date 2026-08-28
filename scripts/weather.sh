@@ -12,6 +12,13 @@ MAX_RETRIES=3
 RETRY_DELAY=2
 CACHE_DIR="${XDG_CACHE_HOME:-$HOME/.cache}/ambxst+/weather"
 
+for _tool in curl jq; do
+	if ! command -v "$_tool" >/dev/null 2>&1; then
+		echo "{\"error\": \"missing $_tool\"}"
+		exit 1
+	fi
+done
+
 # Ensure cache directory exists
 mkdir -p "$CACHE_DIR"
 

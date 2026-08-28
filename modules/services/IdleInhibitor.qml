@@ -9,7 +9,6 @@ Item {
 
     property var _createProcess: Process {
         id: _createProcess
-        command: ["sh", "-c", ""]
         running: false
         stdout: StdioCollector {
             id: _createStdout
@@ -30,11 +29,7 @@ Item {
 
     property var _destroyProcess: Process {
         id: _destroyProcess
-        command: ["sh", "-c", ""]
         running: false
-        stdout: StdioCollector {
-            id: _destroyStdout
-        }
         onExited: (code) => {
             _inhibitorId = 0;
         }
@@ -42,36 +37,28 @@ Item {
 
     property var _toggleProcess: Process {
         id: _toggleProcess
-        command: ["sh", "-c", ""]
         running: false
-        stdout: StdioCollector {
-            id: _toggleStdout
-        }
-        onExited: (code) => {
-            // Toggle complete
-        }
+    }
+
+    function _run(proc, args) {
+        proc.running = false;
+        proc.command = ["axctl", "system"].concat(args);
+        proc.running = true;
     }
 
     function _createInhibitor() {
-        var en = enabled ? 1 : 0;
-        var cmd = "axctl system idle-inhibitor-create " + en;
-        _createProcess.command = ["sh", "-c", cmd];
-        _createProcess.running = true;
+        _run(_createProcess, ["idle-inhibitor-create", enabled ? "1" : "0"]);
     }
 
     function _destroyInhibitor() {
         if (_inhibitorId > 0) {
-            var cmd = "axctl system idle-inhibitor-destroy " + _inhibitorId;
-            _destroyProcess.command = ["sh", "-c", cmd];
-            _destroyProcess.running = true;
+            _run(_destroyProcess, ["idle-inhibitor-destroy", String(_inhibitorId)]);
         }
     }
 
     function _toggleInhibitor(enable) {
         if (_inhibitorId > 0) {
-            var cmd = "axctl system idle-inhibitor-set " + _inhibitorId + " " + (enable ? 1 : 0);
-            _toggleProcess.command = ["sh", "-c", cmd];
-            _toggleProcess.running = true;
+            _run(_toggleProcess, ["idle-inhibitor-set", String(_inhibitorId), enable ? "1" : "0"]);
         }
     }
 

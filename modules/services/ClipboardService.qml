@@ -354,11 +354,9 @@ QtObject {
                 Qt.callLater(root.list);
                 // Clean binary data directory (will only remove files not referenced by pinned items)
                 cleanBinaryDataDirProcess.running = true;
-                // Clear the system clipboard (array args, no shell wrapper)
-                var wlClearProc = Qt.createQmlObject('import Quickshell.Io; Process {}', root);
-                wlClearProc.command = ["wl-copy", "--clear"];
-                wlClearProc.onExited.connect(() => wlClearProc.destroy());
-                wlClearProc.running = true;
+                root.wlCopyProc.command = ["wl-copy", "--clear"];
+                root.wlCopyProc.running = false;
+                root.wlCopyProc.running = true;
             }
         }
     }
@@ -730,20 +728,21 @@ QtObject {
             "DELETE FROM swap_temp;\n" +
             "COMMIT;\n" +
             "EOSQL";
-            
-        var proc = Qt.createQmlObject('import Quickshell.Io; Process {}', root);
-        proc.command = ["sh", "-c", cmd];
-        
-        proc.onExited.connect(function(code) {
-             if (code === 0) {
-                 Qt.callLater(root.list);
-             } else {
-                 console.warn("ClipboardService: dynamic swapProcess failed with code:", code);
-             }
-             proc.destroy();
-        });
-        
-        proc.running = true;
+
+        swapSqlProcess.command = ["sh", "-c", cmd];
+        swapSqlProcess.running = false;
+        swapSqlProcess.running = true;
+    }
+
+    property Process swapSqlProcess: Process {
+        running: false
+        onExited: function(code) {
+            if (code === 0) {
+                Qt.callLater(root.list);
+            } else {
+                console.warn("ClipboardService: swapSqlProcess failed with code:", code);
+            }
+        }
     }
     
 
@@ -795,14 +794,14 @@ QtObject {
     }
     
     // Function to copy and paste emoji via Ctrl+V
+    property Process wlCopyProc: Process {
+        running: false
+    }
+
     function copyAndTypeEmoji(emojiText) {
-        // Copy to clipboard (array args — no shell quoting issues)
-        var copyProc = Qt.createQmlObject('import Quickshell.Io; Process {}', root);
-        copyProc.command = ["wl-copy", emojiText];
-        copyProc.onExited.connect(() => copyProc.destroy());
-        copyProc.running = true;
-        
-        // Schedule Ctrl+V paste
+        wlCopyProc.command = ["wl-copy", emojiText];
+        wlCopyProc.running = false;
+        wlCopyProc.running = true;
         emojiTypeTimer.start();
     }
 

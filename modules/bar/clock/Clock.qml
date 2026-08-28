@@ -1,6 +1,7 @@
 pragma ComponentBehavior: Bound
 import QtQuick
 import QtQuick.Layouts
+import Quickshell
 import qs.config
 import qs.modules.theme
 import qs.modules.components
@@ -626,7 +627,7 @@ Item {
     }
 
     function scheduleNextDayUpdate() {
-        var now = new Date();
+        var now = wallClock.date;
         var next = new Date(now.getFullYear(), now.getMonth(), now.getDate() + 1, 0, 0, 1);
         var ms = next - now;
         dayUpdateTimer.interval = ms;
@@ -634,26 +635,31 @@ Item {
     }
 
     function updateDay() {
-        var now = new Date();
+        var now = wallClock.date;
         var day = Qt.formatDateTime(now, Qt.locale(), "ddd");
         root.currentDayAbbrev = day.slice(0, 3).charAt(0).toUpperCase() + day.slice(1, 3);
         root.currentFullDate = Qt.formatDateTime(now, Qt.locale(), "dddd, MMMM d, yyyy");
         scheduleNextDayUpdate();
     }
 
-    Timer {
-        interval: 1000
-        running: !SuspendManager.isSuspending
-        repeat: true
-        onTriggered: {
-            var now = new Date();
-            var format = Config.bar.use12hFormat ? "h:mm ap" : "hh:mm";
-            var formatted = Qt.formatDateTime(now, format);
-            var parts = formatted.split(":");
-            root.currentTime = formatted;
-            root.currentHours = parts[0];
-            root.currentMinutes = parts[1];
-        }
+    function updateTime() {
+        var now = wallClock.date;
+        var use12 = Config.bar.use12hFormat;
+        root.currentTime = Qt.formatDateTime(now, use12 ? "h:mm ap" : "hh:mm");
+        root.currentHours = Qt.formatDateTime(now, use12 ? "h" : "hh");
+        root.currentMinutes = Qt.formatDateTime(now, "mm");
+    }
+
+    SystemClock {
+        id: wallClock
+        precision: SystemClock.Minutes
+        enabled: !SuspendManager.isSuspending
+        onDateChanged: root.updateTime()
+    }
+
+    Connections {
+        target: Config.bar
+        function onUse12hFormatChanged() { root.updateTime(); }
     }
 
     Timer {
@@ -664,13 +670,7 @@ Item {
     }
 
     Component.onCompleted: {
-        var now = new Date();
-        var format = Config.bar.use12hFormat ? "h:mm ap" : "hh:mm";
-        var formatted = Qt.formatDateTime(now, format);
-        var parts = formatted.split(":");
-        root.currentTime = formatted;
-        root.currentHours = parts[0];
-        root.currentMinutes = parts[1];
-        updateDay();
+        root.updateTime();
+        root.updateDay();
     }
 }

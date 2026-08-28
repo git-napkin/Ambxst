@@ -3,18 +3,28 @@ set -euo pipefail
 
 RUNTIME_DIR="${XDG_RUNTIME_DIR:-/tmp}"
 LOCKFILE="$RUNTIME_DIR/ambxst+_loginlock.pid"
-set -C
-if ! (echo $$ >"$LOCKFILE") 2>/dev/null; then
-	PID=$(cat "$LOCKFILE" 2>/dev/null || echo "")
-	if [ -n "$PID" ] && [ -O "$LOCKFILE" ] && kill -0 "$PID" 2>/dev/null; then
-		exit 0
+mkdir -p "$RUNTIME_DIR"
+
+take_lock() {
+	set -C
+	if (echo $$ >"$LOCKFILE") 2>/dev/null; then
+		set +C
+		return 0
 	fi
 	set +C
+	local pid
+	pid=$(cat "$LOCKFILE" 2>/dev/null || echo "")
+	if [ -n "$pid" ] && [ "$pid" != "$$" ] && [ -O "$LOCKFILE" ] && kill -0 "$pid" 2>/dev/null; then
+		kill "$pid" 2>/dev/null || true
+		sleep 0.1
+	fi
 	rm -f "$LOCKFILE"
 	set -C
 	echo $$ >"$LOCKFILE"
-fi
-set +C
+	set +C
+}
+
+take_lock
 
 # Login Lock Monitor - Reports Lock events on stdout. Execution of the
 # configured lock command is owned by IdleService in the shell (QML side).
