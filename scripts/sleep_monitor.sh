@@ -26,12 +26,7 @@ take_lock() {
 
 take_lock
 
-# Sleep Monitor - Reports PrepareForSleep events. Command execution is owned
-# by IdleService in the shell (QML side), which avoids double-locking and
-# shell-eval injection.
-#
-# We use grep --line-buffered to reliably capture the boolean argument
-# which indicates start (true) or end (false) of sleep
+# grep --line-buffered: GNU grep otherwise buffers the logind boolean in the pipe.
 dbus-monitor --system "type='signal',interface='org.freedesktop.login1.Manager',member='PrepareForSleep'" |
 	grep --line-buffered "boolean" |
 	while read -r line; do

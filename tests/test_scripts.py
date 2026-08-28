@@ -157,8 +157,6 @@ REPO_ROOT = Path(__file__).parent.parent
 
 
 class TestJustWorksContracts(unittest.TestCase):
-    """Source contracts for daemon lifetime, IPC, and clock tick rate."""
-
     def _read(self, *parts):
         return REPO_ROOT.joinpath(*parts).read_text()
 
@@ -200,6 +198,11 @@ class TestJustWorksContracts(unittest.TestCase):
     def test_camera_watcher_has_restart_cap(self):
         src = self._read("modules/services/CameraService.qml")
         self.assertIn("_restartCap", src)
+
+    def test_camera_service_init_uses_sync_running(self):
+        src = self._read("shell.qml")
+        self.assertIn("CameraService._syncRunning.toString()", src)
+        self.assertNotIn("CameraService.update.toString()", src)
 
     def test_axctl_restore_focus_reuses_process(self):
         src = self._read("modules/services/AxctlService.qml")

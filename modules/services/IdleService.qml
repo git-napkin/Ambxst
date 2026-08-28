@@ -14,9 +14,6 @@ Singleton {
     property string beforeSleepCmd: Config.system.idle.general.before_sleep_cmd ?? "loginctl lock-session"
     property string afterSleepCmd: Config.system.idle.general.after_sleep_cmd ?? "ambxst+ screen on"
 
-    // Login Lock Daemon
-    // Helper script that listens to Lock signal and reports LOCK events;
-    // IdleService owns execution of the configured lock command.
     property bool _shuttingDown: false
 
     property var loginLockProc: Process {

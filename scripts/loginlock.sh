@@ -26,8 +26,6 @@ take_lock() {
 
 take_lock
 
-# Login Lock Monitor - Reports Lock events on stdout. Execution of the
-# configured lock command is owned by IdleService in the shell (QML side).
 dbus-monitor --system "type='signal',interface='org.freedesktop.login1.Session',member='Lock'" |
 	while read -r line; do
 		if echo "$line" | grep -q "member=Lock"; then

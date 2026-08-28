@@ -350,9 +350,7 @@ QtObject {
         
         onExited: function(code) {
             if (code === 0) {
-                // Refresh list to show only pinned items
                 Qt.callLater(root.list);
-                // Clean binary data directory (will only remove files not referenced by pinned items)
                 cleanBinaryDataDirProcess.running = true;
                 root.wlCopyProc.command = ["wl-copy", "--clear"];
                 root.wlCopyProc.running = false;
@@ -793,7 +791,6 @@ QtObject {
         }
     }
     
-    // Function to copy and paste emoji via Ctrl+V
     property Process wlCopyProc: Process {
         running: false
     }

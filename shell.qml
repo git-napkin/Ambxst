@@ -318,7 +318,7 @@ ShellRoot {
                 // Non-critical services
                 NightLightService.toggle.toString();
                 GameModeService.toggle.toString();
-                CameraService.update.toString();
+                CameraService._syncRunning.toString();
                 FprintdInterceptor.update.toString();
             });
         }

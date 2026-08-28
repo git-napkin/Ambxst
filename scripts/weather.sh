@@ -19,7 +19,6 @@ for _tool in curl jq; do
 	fi
 done
 
-# Ensure cache directory exists
 mkdir -p "$CACHE_DIR"
 
 # Function to check if cache is valid (not expired)
