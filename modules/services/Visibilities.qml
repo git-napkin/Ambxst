@@ -21,6 +21,37 @@ Singleton {
     property bool playerMenuOpen: false
     readonly property var moduleNames: ["launcher", "dashboard", "overview", "powermenu", "tools", "presets"]
 
+    // BarPopup instances keyed by groupId. Opening one closes the others
+    // in that group so bar flyouts behave like a menu bar.
+    property var barPopupGroups: ({})
+
+    function registerBarPopup(popup) {
+        if (!popup || !popup.groupId)
+            return;
+        const groups = Object.assign({}, barPopupGroups);
+        const list = groups[popup.groupId] || [];
+        for (let i = 0; i < list.length; i++) {
+            if (list[i] !== popup && list[i] !== null && list[i].visible) {
+                list[i].close();
+            }
+        }
+        groups[popup.groupId] = list.filter(p => p !== popup && p !== null).concat([popup]);
+        barPopupGroups = groups;
+    }
+
+    function unregisterBarPopup(popup) {
+        if (!popup || !popup.groupId)
+            return;
+        const groups = Object.assign({}, barPopupGroups);
+        const list = (groups[popup.groupId] || []).filter(p => p !== popup && p !== null);
+        if (list.length === 0) {
+            delete groups[popup.groupId];
+        } else {
+            groups[popup.groupId] = list;
+        }
+        barPopupGroups = groups;
+    }
+
     function setContextMenu(menu) {
         contextMenu = menu;
     }

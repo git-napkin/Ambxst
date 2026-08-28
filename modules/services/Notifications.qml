@@ -715,6 +715,46 @@ Singleton {
         xhr.send();
     }
 
+    function handleNotifyRequest(data) {
+        if (!data)
+            return;
+        const rawActions = data.actions || [];
+        const actionHandlers = {};
+        const actions = [];
+        for (let i = 0; i < rawActions.length; i++) {
+            const a = rawActions[i];
+            if (!a || !a.identifier)
+                continue;
+            actions.push({
+                identifier: a.identifier,
+                text: a.text || a.identifier
+            });
+            if (a.clipboard !== undefined && a.clipboard !== null) {
+                const value = a.clipboard;
+                actionHandlers[a.identifier] = function (_id) {
+                    Quickshell.execDetached([
+                        "bash", "-c",
+                        "printf '%s' " + JSON.stringify(value) + " | wl-copy --type text/plain"
+                    ]);
+                };
+            }
+        }
+
+        root.notifyInternal({
+            summary: data.summary || "",
+            body: data.body || "",
+            appName: data.appName || "ambxst+",
+            appIcon: data.appIcon || "",
+            image: data.image || "",
+            urgency: data.urgency || "normal",
+            expireTimeout: data.expireTimeout || 5000,
+            replaceKey: data.replaceKey || "",
+            actions: actions,
+            actionHandlers: actionHandlers,
+            popup: true
+        });
+    }
+
     Component.onCompleted: {
         notifFileView.reload();
         root.initDone();

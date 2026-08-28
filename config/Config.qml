@@ -1160,6 +1160,9 @@ Singleton {
                 property bool autoStart: false
                 property bool syncSpotify: false
             }
+            property string terminal: "kitty"
+            property bool terminalAdvanced: false
+            property string terminalCommand: "$TERMINAL -e $COMMAND"
         }
     }
 

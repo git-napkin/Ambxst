@@ -263,9 +263,13 @@ Singleton {
         const shadowColorFormatted = formatShadowColors(Config.compositorShadowColor, Config.compositorShadowOpacity);
         toml += `color = "${shadowColorFormatted}"\n`;
 
-        // Animations
+        // Animations. Workspace slide runs along the bar axis so a
+        // left/right bar swaps workspaces vertically.
         toml += "[appearance.animations]\n";
         toml += "enabled = true\n";
+        const barPos = Config.bar?.position || "top";
+        const workspaceStyle = (barPos === "left" || barPos === "right") ? "slidefadevert 20%" : "slidefade 20%";
+        toml += `workspace_style = "${workspaceStyle}"\n`;
 
         // Layout (if set)
         if (GlobalStates.compositorLayout && GlobalStates.compositorLayout.length > 0) {

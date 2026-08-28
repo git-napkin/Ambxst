@@ -431,6 +431,76 @@ PanelWindow {
         }
     }
 
+    function applyFromCli(payload) {
+        if (GlobalStates.wallpaperManager && GlobalStates.wallpaperManager !== wallpaper) {
+            GlobalStates.wallpaperManager.applyFromCli(payload);
+            return;
+        }
+        if (!payload || !payload.path)
+            return;
+
+        if (typeof payload.scheme === "string" && payload.scheme.length > 0)
+            setMatugenScheme(payload.scheme);
+
+        if (payload.oled !== undefined || payload.tint !== undefined) {
+            Config.pauseAutoSave++;
+            if (payload.oled !== undefined)
+                Config.theme.oledMode = payload.oled === true;
+            if (payload.tint !== undefined)
+                wallpaper.tintEnabled = payload.tint === true;
+            Qt.callLater(() => {
+                Config.pauseAutoSave--;
+            });
+        }
+
+        const path = payload.path;
+        const dir = (wallpaperDir || "").replace(/\/+$/, "");
+        const inside = dir && (path === dir || path.startsWith(dir + "/"));
+        if (!inside && dir) {
+            const base = path.substring(path.lastIndexOf("/") + 1) || "wallpaper";
+            const safe = base.replace(/[^A-Za-z0-9._-]/g, "_");
+            cliImportProcess.destination = dir + "/cli_" + Date.now() + "_" + safe;
+            cliImportProcess.monitor = payload.monitor || "";
+            cliImportProcess.command = ["cp", "--", path, cliImportProcess.destination];
+            cliImportProcess.running = true;
+            return;
+        }
+        _applyCliPath(payload.monitor, path);
+    }
+
+    function _applyCliPath(monitor, resolvedPath) {
+        if (wallpaperPaths.indexOf(resolvedPath) === -1)
+            wallpaperPaths = wallpaperPaths.concat([resolvedPath]);
+        if (monitor) {
+            setWallpaper(resolvedPath, monitor);
+            return;
+        }
+        const names = [];
+        for (let i = 0; i < Quickshell.screens.length; i++) {
+            const n = Quickshell.screens[i].name;
+            if (n)
+                names.push(n);
+        }
+        if (names.length === 0)
+            setWallpaper(resolvedPath, null);
+        else
+            for (let i = 0; i < names.length; i++)
+                setWallpaper(resolvedPath, names[i]);
+    }
+
+    property Process cliImportProcess: Process {
+        property string destination: ""
+        property string monitor: ""
+        running: false
+        onExited: (exitCode) => {
+            if (exitCode !== 0) {
+                console.warn("Wallpaper CLI copy failed");
+                return;
+            }
+            wallpaper._applyCliPath(monitor, destination);
+        }
+    }
+
     function clearPerScreenWallpaper(targetScreen) {
         if (GlobalStates.wallpaperManager && GlobalStates.wallpaperManager !== wallpaper) {
             GlobalStates.wallpaperManager.clearPerScreenWallpaper(targetScreen);

@@ -18,6 +18,15 @@ Singleton {
     readonly property string configDir: (Quickshell.env("XDG_CONFIG_HOME") || (Quickshell.env("HOME") + "/.config")) + "/ambxst+"
     readonly property string presetsDir: configDir + "/presets"
     readonly property string assetsPresetsDir: Qt.resolvedUrl("../../assets/presets").toString().replace("file://", "")
+
+    function toast(summary, body, urgency) {
+        Notifications.notifyInternal({
+            summary: summary,
+            body: body || "",
+            appName: "Presets",
+            urgency: urgency || "normal"
+        });
+    }
     readonly property string activePresetFile: presetsDir + "/active_preset"
 
     // Files to exclude from presets (never saved, loaded, or shown)
@@ -85,7 +94,7 @@ Singleton {
 
         if (isOfficialName(presetName)) {
             console.warn("Cannot create preset with official name:", presetName)
-            Quickshell.execDetached(["notify-send", "Error", `Cannot use reserved official name "${presetName}".`])
+            toast("Error", `Cannot use reserved official name "${presetName}".`, "critical")
             return
         }
 
@@ -239,7 +248,7 @@ Singleton {
 
         if (isOfficialName(newName)) {
             console.warn("Cannot rename to official name")
-            Quickshell.execDetached(["notify-send", "Error", `Cannot rename to reserved official name "${newName}".`])
+            toast("Error", `Cannot rename to reserved official name "${newName}".`, "critical")
             return
         }
 
@@ -316,12 +325,12 @@ Singleton {
 
         onExited: function(exitCode) {
             if (exitCode === 0) {
-                Quickshell.execDetached(["notify-send", "Preset Saved", `Preset "${root.pendingPresetName}" saved successfully.`])
+                toast("Preset Saved", `Preset "${root.pendingPresetName}" saved successfully.`)
                 // Trigger scan
                 root.scanProcess.running = true
             } else {
                 console.warn("Failed to save preset:", root.pendingPresetName)
-                Quickshell.execDetached(["notify-send", "Error", `Failed to save preset "${root.pendingPresetName}".`])
+                toast("Error", `Failed to save preset "${root.pendingPresetName}".`, "critical")
             }
             root.pendingPresetName = ""
         }
@@ -334,7 +343,7 @@ Singleton {
 
         onExited: function(exitCode) {
             if (exitCode === 0 && root.pendingRename) {
-                Quickshell.execDetached(["notify-send", "Preset Renamed", `Preset renamed to "${root.pendingRename.newName}".`])
+                toast("Preset Renamed", `Preset renamed to "${root.pendingRename.newName}".`)
                 // Update active preset if it was the renamed one
                 if (root.activePreset === root.pendingRename.oldName) {
                     root.activePreset = root.pendingRename.newName
@@ -345,7 +354,7 @@ Singleton {
                 root.scanProcess.running = true
             } else {
                 console.warn("Failed to rename preset")
-                Quickshell.execDetached(["notify-send", "Error", "Failed to rename preset."])
+                toast("Error", "Failed to rename preset.", "critical")
             }
             root.pendingRename = null
         }
@@ -358,11 +367,11 @@ Singleton {
 
         onExited: function(exitCode) {
             if (exitCode === 0) {
-                Quickshell.execDetached(["notify-send", "Preset Updated", `Preset "${root.pendingUpdateName}" updated successfully.`])
+                toast("Preset Updated", `Preset "${root.pendingUpdateName}" updated successfully.`)
                 root.scanProcess.running = true
             } else {
                 console.warn("Failed to update preset:", root.pendingUpdateName)
-                Quickshell.execDetached(["notify-send", "Error", `Failed to update preset "${root.pendingUpdateName}".`])
+                toast("Error", `Failed to update preset "${root.pendingUpdateName}".`, "critical")
             }
             root.pendingUpdateName = ""
         }
@@ -375,7 +384,7 @@ Singleton {
 
         onExited: function(exitCode) {
             if (exitCode === 0) {
-                Quickshell.execDetached(["notify-send", "Preset Deleted", `Preset "${root.pendingDeleteName}" deleted.`])
+                toast("Preset Deleted", `Preset "${root.pendingDeleteName}" deleted.`)
                 // Clear active preset if it was the deleted one
                 if (root.activePreset === root.pendingDeleteName) {
                     root.activePreset = ""
@@ -383,7 +392,7 @@ Singleton {
                 root.scanProcess.running = true
             } else {
                 console.warn("Failed to delete preset:", root.pendingDeleteName)
-                Quickshell.execDetached(["notify-send", "Error", `Failed to delete preset "${root.pendingDeleteName}".`])
+                toast("Error", `Failed to delete preset "${root.pendingDeleteName}".`, "critical")
             }
             root.pendingDeleteName = ""
         }
@@ -402,11 +411,11 @@ Singleton {
 
         onExited: function(exitCode) {
             if (exitCode === 0) {
-                Quickshell.execDetached(["notify-send", "Preset Loaded", `Preset "${root.currentPreset}" loaded successfully.`])
+                toast("Preset Loaded", `Preset "${root.currentPreset}" loaded successfully.`)
                 root.activePreset = root.currentPreset
             } else {
                 console.warn("Failed to load preset:", root.currentPreset)
-                Quickshell.execDetached(["notify-send", "Error", `Failed to load preset "${root.currentPreset}".`])
+                toast("Error", `Failed to load preset "${root.currentPreset}".`, "critical")
             }
             root.currentPreset = ""
         }

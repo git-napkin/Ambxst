@@ -81,6 +81,18 @@ QtObject {
 
     function run(command) {
         console.log("IPC run command received:", command);
+        const trimmed = command.trim();
+        if (trimmed.startsWith("{")) {
+            let msg;
+            try {
+                msg = JSON.parse(trimmed);
+            } catch (e) {
+                console.warn("Invalid IPC JSON:", e);
+                return;
+            }
+            dispatchStructured(msg);
+            return;
+        }
         const parts = command.split(" ");
         const verb = parts[0];
         if (verb === "super-press") {
@@ -123,6 +135,18 @@ QtObject {
                 GlobalStates.screenshotToolVisible = true;
                 break;
             case "lockscreen": superChord(); GlobalStates.lockscreenVisible = true; break;
+            case "ocr":
+                superChord();
+                Screenshot.initialize();
+                Screenshot.captureMode = "ocr";
+                GlobalStates.screenshotToolVisible = true;
+                break;
+            case "qr":
+                superChord();
+                Screenshot.initialize();
+                Screenshot.captureMode = "qr";
+                GlobalStates.screenshotToolVisible = true;
+                break;
 
             // Audio
             case "volume-up": superChord(); Audio.incrementVolume(); break;
@@ -144,6 +168,36 @@ QtObject {
                 
             default: console.warn("Unknown IPC command:", command);
         }
+    }
+
+    function dispatchStructured(msg) {
+        if (!msg || typeof msg.v !== "string") {
+            console.warn("IPC JSON missing v");
+            return;
+        }
+        switch (msg.v) {
+            case "notify":
+                Notifications.handleNotifyRequest(msg);
+                break;
+            case "wallpaper-set":
+                applyWallpaperCommand(msg);
+                break;
+            case "preset-load":
+                if (msg.name)
+                    PresetsService.loadPreset(msg.name);
+                break;
+            default:
+                console.warn("Unknown IPC JSON verb:", msg.v);
+        }
+    }
+
+    function applyWallpaperCommand(msg) {
+        const manager = GlobalStates.wallpaperManager;
+        if (!manager || !msg.path) {
+            console.warn("wallpaper-set: no manager or path");
+            return;
+        }
+        manager.applyFromCli(msg);
     }
 
     property IpcHandler ipcHandler: IpcHandler {

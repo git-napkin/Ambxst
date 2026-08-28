@@ -1,0 +1,12 @@
+ts	phase	decision	why	evidence	result
+2026-08-28T01:52:40Z	frame	skip Go daemon; cherry-pick user-visible QML/CLI features into plus	plus already has camera fingerprint tests and a bash CLI; copying 750 vendored Go files would wipe those and is a rewrite not a port	prior comparison /tmp/ambxst-compare/Ambxst vs HEAD	open
+2026-08-28T01:52:40Z	frame	skip niri/mango install stubs	plus does not generate niri.kdl or mango.conf so an install line would source missing files	CompositorTomlWriter.qml	skipped
+2026-08-28T01:52:40Z	frame	skip native screencopy loupe and GitHub release binaries	huge Wayland client; plus grim/hyprpicker already work; packaging is not a user-facing gap this run	PLAN.md in upstream clone	skipped
+2026-08-28T01:52:40Z	design	JSON line IPC for structured commands instead of a second Go socket	plus already has a fifo; JSON keeps paths with spaces valid and one protocol	GlobalShortcuts.qml run()	open
+2026-08-28T02:04:36Z	units	ported flyouts slide GTK Zen notify terminal CLI settings OCR into plus	cherry-pick user-visible wins, keep plus camera fingerprint and bash CLI	git diff --stat	landed
+2026-08-28T02:04:36Z	refine	JSON lines on existing FIFO instead of a Go socket	paths with spaces and structured notify wallpaper preset without a second daemon	cli.sh:send_json_ipc modules/services/GlobalShortcuts.qml:dispatchStructured	landed
+2026-08-28T02:04:36Z	refine	colorpicker writes nonblocking FIFO JSON, notify-send only if no reader	upstream blocks 30s on notify-send actions; plus shell already owns toasts	scripts/colorpicker.py:notify_shell tests/test_scripts.py	VERIFIED
+2026-08-28T02:04:36Z	refine	axctl darkmode is best-effort after GTK CSS write	missing axctl must not fail gtk.css generation	modules/theme/GtkGenerator.qml	landed
+2026-08-28T02:04:36Z	verify	python3 tests/test_scripts.py and shellcheck cli.sh	predicate gates encoded in unittest plus CI now shells cli.sh	tests/test_scripts.py .github/workflows/ci.yml	VERIFIED
+2026-08-28T02:04:36Z	skip	Go daemon, native screencopy loupe, niri/mango install, GitHub release binaries	rewrite cost, plus already has grim hyprpicker and a working CLI	prior comparison /tmp/ambxst-compare/Ambxst	skipped
+2026-08-28T02:04:37Z	open	live flyout OCR wallpaper-set on a running qs session	no display session in this agent run	n/a	INCONCLUSIVE

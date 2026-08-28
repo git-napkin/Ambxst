@@ -151,19 +151,16 @@ QtObject {
         id: prepareProcess
         command: ["mkdir", "-p", root.videosDir]
         onExited: exitCode => {
-            notifyStartProcess.running = true;
+            Notifications.notifyInternal({
+                summary: "Screen Recorder",
+                body: "Starting recording...",
+                appName: "Screen Recorder"
+            });
             startProcess.running = true;
             root.isRecording = true;
         }
     }
 
-    // 2. Notify
-    property Process notifyStartProcess: Process {
-        id: notifyStartProcess
-        command: ["notify-send", "Screen Recorder", "Starting recording..."]
-    }
-
-    // 3. Start
     property Process startProcess: Process {
         id: startProcess
         command: ["bash", "-c", "echo 'Error: Command not set'"]
@@ -175,29 +172,27 @@ QtObject {
             id: stderrCollector
             onTextChanged: {
                 console.warn("[ScreenRecorder] ERR: " + text);
-                // root.lastError = text // verbose
             }
         }
 
         onExited: exitCode => {
             console.log("[ScreenRecorder] Exited with code: " + exitCode);
-            if (exitCode !== 0 && exitCode !== 130 && exitCode !== 2) { // 2 = SIGINT
+            if (exitCode !== 0 && exitCode !== 130 && exitCode !== 2) {
                 root.isRecording = false;
-                notifyErrorProcess.running = true;
+                Notifications.notifyInternal({
+                    summary: "Screen Recorder Error",
+                    body: "Failed to start. Check logs.",
+                    appName: "Screen Recorder",
+                    urgency: "critical"
+                });
             } else {
-                notifySavedProcess.running = true;
+                Notifications.notifyInternal({
+                    summary: "Screen Recorder",
+                    body: "Recording saved to " + root.videosDir,
+                    appName: "Screen Recorder"
+                });
             }
         }
-    }
-
-    property Process notifyErrorProcess: Process {
-        id: notifyErrorProcess
-        command: ["notify-send", "-u", "critical", "Screen Recorder Error", "Failed to start. Check logs."]
-    }
-
-    property Process notifySavedProcess: Process {
-        id: notifySavedProcess
-        command: ["notify-send", "Screen Recorder", "Recording saved to " + root.videosDir]
     }
 
     property Process openVideosProcess: Process {

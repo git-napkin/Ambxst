@@ -4,6 +4,7 @@ import QtQuick
 import Quickshell
 import Quickshell.Io
 import qs.modules.globals
+import qs.config
 
 QtObject {
     id: root
@@ -198,7 +199,10 @@ QtObject {
         // command set dynamically
         onExited: exitCode => {
             if (exitCode === 0) {
-                if (root.captureMode === "lens") {
+                if (root.captureMode === "ocr" || root.captureMode === "qr") {
+                    root._runRecognition(root.captureMode, root.finalPath);
+                    root.captureMode = "normal";
+                } else if (root.captureMode === "lens") {
                     root.runLensScript()
                     root.captureMode = "normal" 
                 } else {
@@ -310,7 +314,9 @@ QtObject {
     // Modified processRegion to handle per-monitor cropping
     // It finds the monitor for the given coords, loads THAT monitor's freeze file, and crops.
     function processRegion(x, y, w, h) {
-        if (root.captureMode === "lens") {
+        if (root.captureMode === "ocr" || root.captureMode === "qr") {
+            root.finalPath = "/tmp/ambxst+_" + root.captureMode + ".png";
+        } else if (root.captureMode === "lens") {
             root.finalPath = root.lensPath;
         } else {
             if (root.screenshotsDir === "") {
@@ -458,6 +464,78 @@ QtObject {
                 lensProcess.running = true;
             } else {
                 root.errorOccurred("Image file not ready for Google Lens")
+            }
+        }
+    }
+
+    function ocrLangs() {
+        var cfg = Config.system.ocr;
+        var langs = [];
+        if (cfg) {
+            if (cfg.eng !== false) langs.push("eng");
+            if (cfg.spa !== false) langs.push("spa");
+            if (cfg.lat === true) langs.push("lat");
+            if (cfg.jpn === true) langs.push("jpn");
+            if (cfg.chi_sim === true) langs.push("chi_sim");
+            if (cfg.chi_tra === true) langs.push("chi_tra");
+            if (cfg.kor === true) langs.push("kor");
+        } else {
+            langs = ["eng", "spa"];
+        }
+        if (langs.length === 0) langs.push("eng");
+        return langs.join("+");
+    }
+
+    function _runRecognition(kind, imagePath) {
+        if (kind === "ocr") {
+            ocrProcess.command = ["tesseract", imagePath, "-", "-l", ocrLangs()];
+            ocrProcess.running = true;
+        } else {
+            qrProcess.command = ["zbarimg", "-q", "--raw", imagePath];
+            qrProcess.running = true;
+        }
+    }
+
+    property Process ocrProcess: Process {
+        stdout: StdioCollector {}
+        stderr: StdioCollector {}
+        onExited: (exitCode) => {
+            const text = (ocrProcess.stdout.text || "").replace(/^\s+|\s+$/g, "");
+            if (text.length > 0) {
+                Quickshell.execDetached(["bash", "-c", "printf '%s' " + JSON.stringify(text) + " | wl-copy --type text/plain"]);
+                Notifications.notifyInternal({
+                    summary: "OCR Result",
+                    body: "Text copied to clipboard",
+                    appName: "OCR"
+                });
+            } else {
+                Notifications.notifyInternal({
+                    summary: "OCR Result",
+                    body: "No text detected",
+                    appName: "OCR"
+                });
+            }
+        }
+    }
+
+    property Process qrProcess: Process {
+        stdout: StdioCollector {}
+        stderr: StdioCollector {}
+        onExited: (exitCode) => {
+            const text = (qrProcess.stdout.text || "").replace(/^\s+|\s+$/g, "");
+            if (text.length > 0) {
+                Quickshell.execDetached(["bash", "-c", "printf '%s' " + JSON.stringify(text) + " | wl-copy --type text/plain"]);
+                Notifications.notifyInternal({
+                    summary: "QR/Barcode Result",
+                    body: "Content copied to clipboard",
+                    appName: "QR"
+                });
+            } else {
+                Notifications.notifyInternal({
+                    summary: "QR/Barcode Result",
+                    body: "No code detected",
+                    appName: "QR"
+                });
             }
         }
     }

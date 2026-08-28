@@ -110,7 +110,10 @@ QtObject {
         { label: "Before Sleep", keywords: "loginctl lock-session idle", section: 7, subSection: "idle", subLabel: "System > Idle", icon: Icons.moon, isIcon: true },
         { label: "After Sleep", keywords: "screen on resume idle", section: 7, subSection: "idle", subLabel: "System > Idle", icon: Icons.moon, isIcon: true },
         { label: "Idle Listener", keywords: "timeout brightness screen off suspend", section: 7, subSection: "idle", subLabel: "System > Idle", icon: Icons.moon, isIcon: true },
-        
+
+        // System > Terminal
+        { label: "Terminal", keywords: "kitty foot ghostty alacritty wezterm tmux", section: 7, subSection: "terminal", subLabel: "System > Terminal", icon: Icons.terminal, isIcon: true },
+        { label: "Terminal Command", keywords: "advanced -e execute spawn", section: 7, subSection: "terminal", subLabel: "System > Terminal", icon: Icons.terminal, isIcon: true },
 
         // System > Authentication
         { label: "Authentication", keywords: "password fingerprint pam lock auth", section: 7, subSection: "authentication", subLabel: "System > Authentication", icon: Icons.lock, isIcon: true },

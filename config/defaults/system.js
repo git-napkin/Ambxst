@@ -44,5 +44,8 @@ var data = {
         "restTime": 300,
         "autoStart": false,
         "syncSpotify": false
-    }
+    },
+    "terminal": "kitty",
+    "terminalAdvanced": false,
+    "terminalCommand": "$TERMINAL -e $COMMAND"
 }

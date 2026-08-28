@@ -34,6 +34,10 @@ PopupWindow {
     // Logical open state (changes immediately, not after animation)
     property bool isOpen: false
 
+    // Popups that share a groupId close each other on open. Default "bar"
+    // so clock, layout, and controls flyouts do not stack.
+    property string groupId: "bar"
+
     // Signal emitted when popup is closed externally (click outside)
     signal closedExternally
 
@@ -169,6 +173,8 @@ PopupWindow {
         if (visible)
             return;
 
+        Visibilities.registerBarPopup(root);
+
         isOpen = true;
         popupOpacity = 0;
         popupScale = 0.9;
@@ -184,6 +190,8 @@ PopupWindow {
     function close() {
         if (!visible)
             return;
+
+        Visibilities.unregisterBarPopup(root);
 
         isOpen = false;
         focusActive = false;
@@ -207,4 +215,6 @@ PopupWindow {
             root.visible = false;
         }
     }
+
+    Component.onDestruction: Visibilities.unregisterBarPopup(root)
 }

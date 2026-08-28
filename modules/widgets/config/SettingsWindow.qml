@@ -16,10 +16,12 @@ FloatingWindow {
     title: "Ambxst[+] Settings"
     visible: GlobalStates.settingsWindowVisible
 
-    // Center on screen (approximate, since FloatingWindow usually centers by default or relies on WM)
-    // We can't easily force center without screen geometry, but WM usually handles it.
-
     color: "transparent"
+
+    // Resolve the target screen before the backing window is created.
+    // Changing screen while visible makes Quickshell hide/show the window,
+    // which fires onVisibleChanged(false) and looks like an external close.
+    screen: screenByName(GlobalStates.settingsTargetScreenName)
 
     function screenByName(name) {
         if (!name) return null;
@@ -34,11 +36,6 @@ FloatingWindow {
     }
 
     function preparePlacement() {
-        const targetScreen = screenByName(GlobalStates.settingsTargetScreenName || AxctlService.focusedMonitor?.name || "");
-        if (targetScreen) {
-            settingsWindow.screen = targetScreen;
-        }
-
         placementTimer.attempts = 0;
         placementTimer.restart();
     }

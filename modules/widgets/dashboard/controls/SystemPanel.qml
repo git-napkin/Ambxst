@@ -150,6 +150,10 @@ Item {
                             sectionId: "idle"
                         }
                         SectionButton {
+                            text: "Terminal"
+                            sectionId: "terminal"
+                        }
+                        SectionButton {
                             text: "Authentication"
                             sectionId: "authentication"
                         }
@@ -1245,6 +1249,86 @@ Item {
                                     });
                                     Config.system.idle.listeners = list;
                                     GlobalStates.markShellChanged();
+                                }
+                            }
+                        }
+                    }
+
+                    // =====================
+                    // TERMINAL SECTION
+                    // =====================
+                    ColumnLayout {
+                        visible: root.currentSection === "terminal"
+                        property string settingsSection: "terminal"
+                        Layout.fillWidth: true
+                        spacing: 8
+
+                        Text {
+                            text: "Terminal"
+                            font.family: Config.theme.font
+                            font.pixelSize: Styling.fontSize(-1)
+                            font.weight: Font.Medium
+                            color: Colors.overSurfaceVariant
+                            Layout.bottomMargin: -4
+                        }
+
+                        Text {
+                            text: "Used to open tmux sessions from the dashboard."
+                            font.family: Config.theme.font
+                            font.pixelSize: Styling.fontSize(-2)
+                            color: Colors.overSurfaceVariant
+                            opacity: 0.7
+                            wrapMode: Text.WordWrap
+                            Layout.fillWidth: true
+                        }
+
+                        TextInputRow {
+                            label: "Terminal"
+                            value: Config.system.terminal ?? "kitty"
+                            placeholder: "foot, kitty, ghostty, alacritty, wezterm…"
+                            onValueEdited: newValue => {
+                                const v = newValue.trim();
+                                if (v !== Config.system.terminal) {
+                                    Config.system.terminal = v;
+                                }
+                            }
+                        }
+
+                        ToggleRow {
+                            Layout.fillWidth: true
+                            label: "Advanced options"
+                            description: "Use a custom command template for terminals that do not accept -e"
+                            checked: Config.system.terminalAdvanced ?? false
+                            onToggled: checked => {
+                                if (checked !== Config.system.terminalAdvanced) {
+                                    Config.system.terminalAdvanced = checked;
+                                }
+                            }
+                        }
+
+                        ColumnLayout {
+                            visible: Config.system.terminalAdvanced ?? false
+                            Layout.fillWidth: true
+                            spacing: 8
+
+                            Text {
+                                text: "$TERMINAL is the binary above. $COMMAND is the full bash command to run."
+                                font.family: Config.theme.font
+                                font.pixelSize: Styling.fontSize(-2)
+                                color: Colors.overSurfaceVariant
+                                opacity: 0.7
+                                wrapMode: Text.WordWrap
+                                Layout.fillWidth: true
+                            }
+
+                            TextInputRow {
+                                label: "Open with"
+                                value: Config.system.terminalCommand ?? "$TERMINAL -e $COMMAND"
+                                placeholder: "$TERMINAL -e $COMMAND"
+                                onValueEdited: newValue => {
+                                    if (newValue !== Config.system.terminalCommand) {
+                                        Config.system.terminalCommand = newValue;
+                                    }
                                 }
                             }
                         }

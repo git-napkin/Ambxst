@@ -74,6 +74,13 @@ Commands:
     brightness -s [monitor]           Save current brightness
     brightness -r [monitor]           Restore saved brightness
     brightness -l                     List monitors and their brightness
+    wallpaper <file>                  Set wallpaper on the running shell
+        -scheme <name>                Matugen scheme for this wallpaper
+        -oled                         OLED mode for this wallpaper only
+        -tint                         Tint for this wallpaper only
+        -monitor <id|name>            Apply to one monitor
+    preset -l                         List presets
+    preset "Name"                     Load a preset
     help                              Show this help message
     version, -v, --version            Show Ambxst[+] version
     goodbye                           Uninstall Ambxst[+] :(
@@ -88,6 +95,9 @@ Examples:
     ambxst+ brightness 10 -s           Save current, then set all to 10%
     ambxst+ brightness -s HDMI-A-1     Save current brightness of HDMI-A-1
     ambxst+ brightness -r              Restore saved brightness
+    ambxst+ wallpaper ~/Pictures/wall.png -scheme scheme-tonal-spot
+    ambxst+ preset -l
+    ambxst+ preset "ambxst+ Default"
 
 EOF
 }
@@ -225,6 +235,50 @@ find_ambxst_plus_pid_cached() {
 	echo "$pid"
 }
 
+is_nix_store_symlink() {
+	local path="$1"
+	[ -L "$path" ] || return 1
+	local target
+	target=$(readlink "$path")
+	case "$target" in
+	/nix/store/*) return 0 ;;
+	esac
+	return 1
+}
+
+print_home_manager_hyprland_guide() {
+	cat <<'EOF'
+Ambxst[+]: this Hyprland config is managed by home-manager (symlink into /nix/store).
+Refusing to write through it. Import Ambxst[+] from home.nix instead:
+
+  xdg.configFile."hypr/hyprland.lua".text = ''
+    loadfile(os.getenv("HOME") .. "/.local/share/ambxst+/hyprland.lua")()
+  '';
+EOF
+}
+
+send_json_ipc() {
+	local json="$1"
+	local pipe="${XDG_RUNTIME_DIR:-/tmp}/ambxst+_ipc.pipe"
+
+	if [ -p "$pipe" ]; then
+		printf '%s\n' "$json" >"$pipe" &
+		return 0
+	fi
+
+	local pid
+	pid=$(find_ambxst_plus_pid_cached)
+	if [ -z "$pid" ]; then
+		echo "Error: Ambxst[+] is not running" >&2
+		return 1
+	fi
+
+	qs ipc --pid "$pid" call 'ambxst+' run "$json" 2>/dev/null || {
+		echo "Error: Could not send command to Ambxst[+]" >&2
+		return 1
+	}
+}
+
 save_current_brightness() {
 	local save_file="$1"
 	local monitor="${2:-}"
@@ -236,7 +290,7 @@ save_current_brightness() {
 			return 0
 		}
 		if [ -f "${save_file}.tmp" ]; then
-			while IFS=: read -r name bright method; do
+			while IFS=: read -r name bright _; do
 				if [ -n "$name" ] && [ -n "$bright" ]; then
 					echo "${name}:${bright}"
 				fi
@@ -549,6 +603,97 @@ brightness)
 		echo "Set brightness to ${VALUE}% for $MONITOR"
 	fi
 	;;
+wallpaper)
+	shift
+	WP_FILE=""
+	WP_SCHEME=""
+	WP_OLED=""
+	WP_TINT=""
+	WP_MONITOR=""
+	while [ $# -gt 0 ]; do
+		case "$1" in
+		-scheme)
+			WP_SCHEME="${2:-}"
+			if [ -z "$WP_SCHEME" ]; then
+				echo "Error: -scheme needs a name" >&2
+				exit 2
+			fi
+			shift 2
+			;;
+		-oled)
+			WP_OLED="true"
+			shift
+			;;
+		-tint)
+			WP_TINT="true"
+			shift
+			;;
+		-monitor)
+			WP_MONITOR="${2:-}"
+			if [ -z "$WP_MONITOR" ]; then
+				echo "Error: -monitor needs a name" >&2
+				exit 2
+			fi
+			shift 2
+			;;
+		-*)
+			echo "Error: unknown wallpaper flag '$1'" >&2
+			exit 2
+			;;
+		*)
+			if [ -n "$WP_FILE" ]; then
+				echo "Error: extra wallpaper argument '$1'" >&2
+				exit 2
+			fi
+			WP_FILE="$1"
+			shift
+			;;
+		esac
+	done
+	if [ -z "$WP_FILE" ]; then
+		echo "Error: wallpaper needs a file path" >&2
+		exit 2
+	fi
+	if [ ! -e "$WP_FILE" ]; then
+		echo "Error: wallpaper not found: $WP_FILE" >&2
+		exit 1
+	fi
+	WP_ABS=$(readlink -f -- "$WP_FILE")
+	WP_JSON=$(
+		python3 -c '
+import json, os, sys
+payload = {"v": "wallpaper-set", "path": sys.argv[1]}
+scheme, oled, tint, monitor = sys.argv[2:6]
+if scheme:
+    payload["scheme"] = scheme
+if oled:
+    payload["oled"] = True
+if tint:
+    payload["tint"] = True
+if monitor:
+    payload["monitor"] = monitor
+print(json.dumps(payload))
+' "$WP_ABS" "$WP_SCHEME" "$WP_OLED" "$WP_TINT" "$WP_MONITOR"
+	)
+	send_json_ipc "$WP_JSON" || exit 1
+	echo "Wallpaper set: $WP_ABS"
+	;;
+preset)
+	shift
+	PRESET_ARG="${1:-}"
+	PRESET_USER="${XDG_CONFIG_HOME:-$HOME/.config}/ambxst+/presets"
+	PRESET_ASSETS="${SCRIPT_DIR}/assets/presets"
+	if [ -z "$PRESET_ARG" ] || [ "$PRESET_ARG" = "-l" ]; then
+		{
+			[ -d "$PRESET_USER" ] && find "$PRESET_USER" -mindepth 1 -maxdepth 1 -type d -printf '%f\n'
+			[ -d "$PRESET_ASSETS" ] && find "$PRESET_ASSETS" -mindepth 1 -maxdepth 1 -type d -printf '%f\n'
+		} | sort -u
+		exit 0
+	fi
+	PRESET_JSON=$(python3 -c 'import json,sys; print(json.dumps({"v":"preset-load","name":sys.argv[1]}))' "$PRESET_ARG")
+	send_json_ipc "$PRESET_JSON" || exit 1
+	echo "Preset load requested: $PRESET_ARG"
+	;;
 version | -v | --version)
 	echo "Ambxst[+] $(cat "${SCRIPT_DIR}/version")"
 	;;
@@ -559,8 +704,12 @@ install)
 		HYPR_LUA="$HYPR_DIR/hyprland.lua"
 		HYPR_CONF="$HYPR_DIR/hyprland.conf"
 
-		# Create directory if needed
 		mkdir -p "$HYPR_DIR"
+
+		if is_nix_store_symlink "$HYPR_LUA" || is_nix_store_symlink "$HYPR_CONF"; then
+			print_home_manager_hyprland_guide
+			exit 0
+		fi
 
 		if [ -f "$HYPR_LUA" ] || [ ! -f "$HYPR_CONF" ]; then
 			append_ambxst_plus_hyprland_block "$HYPR_LUA" "$AMBXST_PLUS_HYPR_LUA_SOURCE" "$AMBXST_PLUS_HYPR_LUA_BLOCK"
@@ -580,6 +729,11 @@ remove)
 		HYPR_DIR="$HOME/.config/hypr"
 		HYPR_LUA="$HYPR_DIR/hyprland.lua"
 		HYPR_CONF="$HYPR_DIR/hyprland.conf"
+
+		if is_nix_store_symlink "$HYPR_LUA" || is_nix_store_symlink "$HYPR_CONF"; then
+			echo "Ambxst[+]: Hyprland config is home-manager managed. Remove the import from home.nix instead."
+			exit 0
+		fi
 
 		remove_ambxst_plus_hyprland_block "$HYPR_LUA" "$AMBXST_PLUS_HYPR_LUA_SOURCE"
 		remove_ambxst_plus_hyprland_block "$HYPR_CONF" "$AMBXST_PLUS_HYPR_CONF_SOURCE"
@@ -649,7 +803,8 @@ help | --help | -h)
 
 	# Set QS_ICON_THEME environment variable
 	if command -v gsettings >/dev/null 2>&1; then
-		export QS_ICON_THEME=$(gsettings get org.gnome.desktop.interface icon-theme | tr -d "'")
+		QS_ICON_THEME=$(gsettings get org.gnome.desktop.interface icon-theme | tr -d "'")
+		export QS_ICON_THEME
 	fi
 
 	# Force Qt6CT

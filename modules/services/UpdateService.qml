@@ -148,26 +148,23 @@ Singleton {
     function sendUpdateNotification(newVersion) {
         const summary = "ambxst+ update available!";
         const body = newVersion + " available! (Installed " + root.currentVersion + ")";
-        const cmd = "notify-send -a 'ambxst+ Update' -i system-software-update -w '" + summary + "' '" + body + "' --action=changelog=Changelog --action=later='Maybe later'";
-        
-        notificationProcess.running = false;
-        notificationProcess.command = ["bash", "-c", cmd];
-        notificationProcess.running = true;
-    }
-
-    property Process notificationProcess: Process {
-        id: notificationProcess
-        stdout: StdioCollector {
-            id: stdoutCollector
-        }
-        onExited: exitCode => {
-            const action = stdoutCollector.text.trim();
-            if (action === "changelog") {
-                Quickshell.execDetached(["xdg-open", root.changelogUrl]);
-            } else if (action === "later") {
-                root.nextCheckTime = Date.now() + 8 * 3600000;
-                root.saveCache();
+        Notifications.notifyInternal({
+            summary: summary,
+            body: body,
+            appName: "ambxst+ Update",
+            appIcon: "system-software-update",
+            actions: [
+                { identifier: "changelog", text: "Changelog" },
+                { identifier: "later", text: "Maybe later" }
+            ],
+            actionHandlers: {
+                changelog: function (_id) {
+                    Quickshell.execDetached(["xdg-open", root.changelogUrl]);
+                },
+                later: function (_id) {
+                    root.nextCheckTime = Date.now() + 8 * 3600000;
+                    root.saveCache();
+                }
             }
-        }
+        });
     }
-}

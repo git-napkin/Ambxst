@@ -297,19 +297,18 @@ Item {
     }
 
     function createTmuxSession(sessionName) {
-        if (sessionName) {
-            createProcess.command = ["bash", "-c", `cd "$HOME" && setsid kitty -e tmux new -s "${sessionName}" < /dev/null > /dev/null 2>&1 &`];
-        } else {
-            createProcess.command = ["bash", "-c", `cd "$HOME" && setsid kitty -e tmux < /dev/null > /dev/null 2>&1 &`];
-        }
-        createProcess.running = true;
-        // Cerrar el dashboard
+        const quoted = sessionName ? JSON.stringify(sessionName) : "";
+        const cmd = sessionName
+            ? `cd "$HOME" && tmux new -s ${quoted}`
+            : `cd "$HOME" && tmux`;
+        TerminalService.execDetached(cmd);
         Visibilities.setActiveModule("");
+        Qt.callLater(() => root.refreshTmuxSessions());
     }
 
     function attachToSession(sessionName) {
-        attachProcess.command = ["bash", "-c", `cd "$HOME" && setsid kitty -e tmux attach-session -t "${sessionName}" < /dev/null > /dev/null 2>&1 &`];
-        attachProcess.running = true;
+        TerminalService.execDetached(`cd "$HOME" && tmux attach-session -t ${JSON.stringify(sessionName)}`);
+        Visibilities.setActiveModule("");
     }
 
     function switchToWindow(sessionName, windowIndex) {
@@ -382,27 +381,6 @@ Item {
                 root.tmuxSessions = [];
                 root.updateFilteredSessions();
             }
-        }
-    }
-
-    Process {
-        id: createProcess
-        running: false
-
-        onExited: function (code) {
-            if (code === 0) {
-                root.refreshTmuxSessions();
-            }
-        }
-    }
-
-    Process {
-        id: attachProcess
-        running: false
-
-        onStarted: function () {
-            // Cerrar el dashboard
-            Visibilities.setActiveModule("");
         }
     }
 
