@@ -284,8 +284,7 @@ QtObject {
     // ever missed (e.g. the fprintd service dies silently).
     property var deviceMonitorProcess: null
 
-    Timer {
-        id: deviceMonitorFallbackTimer
+    property Timer deviceMonitorFallbackTimer: Timer {
         interval: 30000
         repeat: true
         running: false

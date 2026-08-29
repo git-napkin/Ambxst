@@ -803,8 +803,9 @@ help | --help | -h)
 
 	# Set QS_ICON_THEME environment variable
 	if command -v gsettings >/dev/null 2>&1; then
-		QS_ICON_THEME=$(gsettings get org.gnome.desktop.interface icon-theme | tr -d "'")
-		export QS_ICON_THEME
+		if QS_ICON_THEME=$(gsettings get org.gnome.desktop.interface icon-theme 2>/dev/null | tr -d "'"); then
+			export QS_ICON_THEME
+		fi
 	fi
 
 	# Force Qt6CT
